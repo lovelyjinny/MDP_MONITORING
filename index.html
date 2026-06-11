@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MDP 모니터링</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --navy:#1f2a44; --navy2:#2b3a5c; --yellow:#ffd400; --yellow2:#ffe45c;
+    --red:#e5484d; --redbg:#fdeced; --amber:#f59e0b; --amberbg:#fef6e7;
+    --green:#16a34a; --greenbg:#eafaef; --gray:#6b7280; --line:#e6e8ee;
+    --bg:#f4f6fa; --card:#ffffff; --text:#1f2937;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+  .jua{font-family:'Jua',sans-serif}
+
+  /* 사이드바 */
+  .side{width:210px;background:var(--navy);color:#fff;flex-shrink:0;display:flex;flex-direction:column;padding:18px 0}
+  .side h1{font-family:'Jua',sans-serif;font-size:20px;padding:0 20px 4px;letter-spacing:.5px}
+  .side .sub{font-size:11px;color:#9aa6c4;padding:0 20px 18px}
+  .nav{flex:1}
+  .nav a{display:flex;align-items:center;gap:9px;padding:12px 20px;color:#c7cfe2;cursor:pointer;font-size:14px;border-left:3px solid transparent}
+  .nav a:hover{background:var(--navy2);color:#fff}
+  .nav a.on{background:var(--navy2);color:#fff;border-left-color:var(--yellow);font-weight:bold}
+  .side .foot{font-size:10px;color:#7f8aa8;padding:14px 20px 0;border-top:1px solid #33405f;margin-top:10px}
+
+  /* 메인 */
+  .main{flex:1;padding:26px 32px;overflow:auto}
+  .top{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px}
+  .top .ttl{font-family:'Jua',sans-serif;font-size:26px;color:var(--navy)}
+  .top .date{font-size:13px;color:var(--gray)}
+  .top .date b{color:var(--navy);font-size:15px}
+
+  .page{display:none}
+  .page.on{display:block}
+
+  /* 대시보드 담당자 필터 */
+  .radar-filter{display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:13px}
+  .radar-filter select{padding:7px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit}
+  .r-myname{font-size:12px;color:var(--green);font-weight:bold}
+  /* 통계 카드 */
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px}
+  .stat{background:var(--card);border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .stat .n{font-family:'Jua',sans-serif;font-size:30px;line-height:1}
+  .stat .l{font-size:12px;color:var(--gray);margin-top:7px}
+  .stat.red .n{color:var(--red)} .stat.amber .n{color:var(--amber)}
+  .stat.green .n{color:var(--green)} .stat.navy .n{color:var(--navy)}
+
+  /* 섹션 */
+  .sec{background:var(--card);border-radius:14px;padding:20px 22px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .sec h2{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .sec h2 .cnt{font-size:12px;color:#fff;border-radius:20px;padding:2px 9px}
+  .badge-red{background:var(--red)} .badge-amber{background:var(--amber)} .badge-green{background:var(--green)} .badge-gray{background:var(--gray)}
+
+  /* 레이더 항목 */
+  .alert{display:grid;grid-template-columns:14px minmax(0,2.4fr) minmax(0,1.4fr) 70px auto;align-items:center;gap:14px;padding:9px 18px;border-radius:8px;margin-bottom:5px;cursor:pointer;border:1px solid transparent}
+  .alert.r{background:var(--redbg)} .alert.a{background:var(--amberbg)}
+  .alert.r:hover{border-color:var(--red)} .alert.a:hover{border-color:var(--amber)}
+  .alert .dot{width:8px;height:8px;border-radius:50%}
+  .alert.r .dot{background:var(--red)} .alert.a .dot{background:var(--amber)}
+  .alert .a-info{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .alert .a-info b{font-size:13px;color:var(--navy)}
+  .alert .a-sub{font-size:11px;color:var(--gray);margin-left:7px}
+  .alert .a-stage{min-width:0;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .alert .a-stage .hot{font-weight:bold}
+  .alert.r .a-stage .hot{color:var(--red)} .alert.a .a-stage .hot{color:var(--amber)}
+  .alert .a-dim{color:#9aa0aa;font-size:10.5px}
+  .alert .a-late{text-align:right;line-height:1.15}
+  .alert .a-late b{font-size:15px}
+  .alert.r .a-late b{color:var(--red)} .alert.a .a-late b{color:var(--amber)}
+  .alert .act{display:flex;gap:5px;justify-self:end}
+  .st-skip{color:#cfd3db;font-size:9px}
+  .otype-badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:20px;font-weight:bold}
+  .ot-해외{background:#e7f0ff;color:#2b6cb0} .ot-국내일반{background:#eafaef;color:#16a34a} .ot-국내직납{background:#fef3e7;color:#d97706}
+  .btn{border:none;border-radius:8px;padding:7px 13px;font-size:12px;cursor:pointer;font-family:inherit}
+  .btn-y{background:var(--yellow);color:var(--navy);font-weight:bold}
+  .btn-y:hover{background:var(--yellow2)}
+  .btn-o{background:#fff;border:1px solid var(--line);color:#444}
+  .btn-o:hover{background:#f7f8fa}
+  .empty{color:var(--gray);font-size:13px;padding:16px;text-align:center}
+
+  /* 테이블 */
+  .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .filters select,.filters input{padding:8px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:11px 10px;text-align:left;border-bottom:1px solid var(--line)}
+  th{font-size:11.5px;color:var(--gray);font-weight:600;background:#fafbfc}
+  tbody tr{cursor:pointer} tbody tr:hover{background:#fafbff}
+  .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:bold}
+  .pill.r{background:var(--redbg);color:var(--red)} .pill.a{background:var(--amberbg);color:var(--amber)}
+  .pill.g{background:var(--greenbg);color:var(--green)} .pill.gray{background:#eef0f4;color:var(--gray)}
+  .prog{height:7px;background:#eef0f4;border-radius:10px;overflow:hidden;width:90px}
+  .prog i{display:block;height:100%;background:var(--navy)}
+
+  /* 상세 모달 */
+  .modal{position:fixed;inset:0;background:rgba(20,28,48,.45);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal.on{display:flex}
+  .sheet{background:#fff;border-radius:16px;width:min(720px,94vw);max-height:90vh;overflow:auto;padding:24px 26px}
+  .sheet .hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+  .sheet .hd .bn{font-family:'Jua',sans-serif;font-size:21px;color:var(--navy)}
+  .sheet .hd .meta{font-size:12.5px;color:var(--gray);margin-top:4px}
+  .x{border:none;background:#f0f1f5;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px}
+  /* 타임라인 */
+  .tl{margin-top:18px}
+  .step{display:grid;grid-template-columns:18px 130px 1fr 110px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .step .mk{width:13px;height:13px;border-radius:50%;border:2px solid #cbd2e0;background:#fff}
+  .step.done .mk{background:var(--green);border-color:var(--green)}
+  .step.late .mk{background:var(--red);border-color:var(--red)}
+  .step.next .mk{background:var(--amber);border-color:var(--amber);box-shadow:0 0 0 4px var(--amberbg)}
+  .step .sname{font-size:13.5px;font-weight:bold}
+  .step .sname small{display:block;font-weight:normal;color:#aaa;font-size:10.5px}
+  .step .sdate{font-size:12.5px;color:#666}
+  .step .sdate .plan{color:#999} .step .sdate .act{color:var(--green);font-weight:bold} .step .sdate .lateT{color:var(--red);font-weight:bold}
+  .step .sin{display:flex;gap:5px;justify-content:flex-end}
+  .step input[type=date]{padding:5px 7px;border:1px solid var(--line);border-radius:7px;font-size:11.5px}
+  .miniY{background:var(--yellow);border:none;border-radius:7px;padding:5px 9px;font-size:11px;font-weight:bold;color:var(--navy);cursor:pointer}
+  .m-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+  /* 와이드 오더 리스트 (기존 MDP 판 스타일) */
+  .tbl-wrap{overflow:auto;max-width:100%;max-height:72vh;border:1px solid var(--line);border-radius:10px}
+  table.wide{min-width:max-content;border-collapse:separate;border-spacing:0;font-size:11px}
+  table.wide th,table.wide td{padding:4px 7px;white-space:nowrap;text-align:center;border-bottom:1px solid #eef0f4;border-right:1px solid #f3f4f7}
+  table.wide th{font-size:10px;position:sticky;top:0;background:#1f2a44;color:#dfe4ef;font-weight:600;z-index:1;line-height:1.25}
+  table.wide td.l{text-align:left}
+  table.wide tbody tr{cursor:pointer}
+  table.wide tbody tr:nth-child(even) td{background:#fafbfc}
+  table.wide tbody tr:hover td{background:#fff7d6}
+  table.wide td.brand{font-weight:bold;color:var(--navy)}
+  /* 틀고정: 왼쪽 3칸(상태·현재단계·브랜드) */
+  table.wide td.fx,table.wide th.fx{position:sticky;z-index:2;background:#fff}
+  table.wide thead th.fx{z-index:4;background:#1f2a44}
+  table.wide tbody tr:nth-child(even) td.fx{background:#fafbfc}
+  table.wide tbody tr:hover td.fx{background:#fff7d6}
+  table.wide .fx1{left:0;min-width:50px;max-width:50px}
+  table.wide .fx2{left:50px;min-width:108px;max-width:108px}
+  table.wide .fx3{left:158px;min-width:94px;max-width:94px;box-shadow:2px 0 5px rgba(0,0,0,.07)}
+  .st-done{color:var(--green);font-weight:bold}
+  .st-late{color:#fff;background:var(--red);border-radius:4px;padding:1px 4px;font-weight:bold}
+  .st-soon{color:var(--navy);background:var(--yellow);border-radius:4px;padding:1px 4px;font-weight:bold}
+  .st-plan{color:#c2c7d0}
+  .st-na{color:#e2e2e2}
+  /* 신규 오더 폼 */
+  .mailbox{width:100%;height:78px;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12.5px;font-family:inherit;resize:vertical;margin:14px 0 8px}
+  .mailrow{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .mailhint{font-size:12px;min-height:17px}
+  .frm{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin-top:14px;border-top:1px solid var(--line);padding-top:16px}
+  .frm label{font-size:12px;color:#555;display:flex;flex-direction:column;gap:5px}
+  .frm label.req::after{content:' *';color:var(--red)}
+  .frm input,.frm select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit}
+  .frm-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+  /* 무역팀 시트 연결 */
+  .trade-sec{margin-top:20px;border-top:2px solid var(--line);padding-top:14px}
+  .trade-sec h3{font-size:14px;margin-bottom:10px}
+  .trade-sec h3 small{font-weight:normal;color:var(--gray);font-size:11px}
+  .trade-tbl{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:8px}
+  .trade-tbl th,.trade-tbl td{padding:6px 7px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+  .trade-tbl th{font-size:10.5px;color:var(--gray);background:#fafbfc}
+  .trade-tbl td.l{text-align:left}
+  .trade-tbl tr.lk td{background:#eafaef}
+  /* 구간 담당 배지 */
+  .own-badge{display:inline-block;font-size:9.5px;padding:1px 6px;border-radius:20px;font-weight:bold;background:#eef0f4;color:#555;margin-left:5px;vertical-align:1px}
+  .own-무역팀{background:#e7f0ff;color:#2b6cb0} .own-물류팀{background:#eafaef;color:#16a34a}
+  .own-통합정보{background:#f3e8ff;color:#7c3aed} .own-재무{background:#fef3e7;color:#d97706} .own-대표님{background:#fdeced;color:#e5484d}
+  .own-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;font-size:11.5px}
+  .own-chips span{background:#f4f6fa;border:1px solid var(--line);border-radius:20px;padding:3px 10px}
+  .own-chips b{color:var(--red)}
+  /* 관리자 모드 게이트: 로그인 안 하면 수정 기능 전부 숨김 (보기 전용) */
+  body:not(.is-admin) .adm{display:none !important}
+  .adm-badge{display:inline-block;background:var(--yellow);color:var(--navy);font-size:10px;font-weight:bold;border-radius:20px;padding:2px 8px;margin-left:6px}
+  .login-err{color:var(--red);font-size:12px;min-height:16px;margin-top:8px}
+</style>
+</head>
+<body>
+  <!-- 사이드바 -->
+  <nav class="side">
+    <h1>📦 MDP 모니터링</h1>
+    <div class="sub">매입~출고 적시 관제</div>
+    <div class="nav">
+      <a data-pg="radar" class="on">📊 대시보드</a>
+      <a data-pg="list">📋 오더 리스트</a>
+      <a data-pg="agg">🧮 집계</a>
+      <a data-pg="admin" id="navAdmin" style="display:none">🗂 관리자판<span class="adm-badge">관리자</span></a>
+      <a id="btnNew" class="adm" style="color:var(--yellow);font-weight:bold">➕ 신규 오더 등록</a>
+      <a id="btnUpload" class="adm" style="color:#7fd1ff;font-weight:bold">📥 발주현황 올리기</a>
+      <a id="btnTrade" style="color:#8be9b8;font-weight:bold">🔄 무역·물류 새로고침</a>
+      <a id="btnLogin" style="color:#c7cfe2">👤 관리자 로그인</a>
+      <a id="btnLogout" style="display:none;color:#c7cfe2">↩ 로그아웃 <span class="adm-badge">관리자 모드</span></a>
+    </div>
+    <input type="file" id="fileUp" accept=".xlsx,.xls" style="display:none">
+    <div class="foot"><span id="tradeInfo">무역팀 시트: 미연결</span><br><span id="cloudInfo">☁ 클라우드 연결 중…</span><br>v1 프로토타입 · by 유니 🤖</div>
+  </nav>
+
+  <!-- 메인 -->
+  <div class="main">
+    <div class="top">
+      <div>
+        <div class="ttl" id="pgTitle">대시보드</div>
+      </div>
+      <div class="date">오늘 <b id="today"></b></div>
+    </div>
+
+    <!-- 레이더 -->
+    <div class="page on" id="pg-radar">
+      <div class="radar-filter">
+        <span>👤 담당자</span>
+        <select id="r-md"><option value="">전체</option></select>
+        <button id="r-saveme" class="btn btn-o">⭐ 내 이름으로 저장</button>
+        <button id="r-kakao" class="btn btn-y">📋 카톡 문구 복사</button>
+        <button id="r-export" class="btn btn-o adm">📧 메일용 내보내기</button>
+        <button id="r-owners" class="btn btn-o adm">⚙ 구간담당 설정</button>
+        <span id="r-myname" class="r-myname"></span>
+      </div>
+      <div class="stats">
+        <div class="stat red"><div class="n" id="s-late">0</div><div class="l">🔴 지연되고 있음</div></div>
+        <div class="stat amber"><div class="n" id="s-soon">0</div><div class="l">🟡 오늘·이번주 챙길 것</div></div>
+        <div class="stat green"><div class="n" id="s-ok">0</div><div class="l">🟢 정상 진행</div></div>
+        <div class="stat navy"><div class="n" id="s-all">0</div><div class="l">전체 진행 중 건</div></div>
+        <div class="stat green"><div class="n" id="s-done">0</div><div class="l">✓ 완료</div></div>
+      </div>
+
+      <div class="sec">
+        <h2>🔴 지금 지연되고 있음 <span class="cnt badge-red" id="c-late">0</span></h2>
+        <div id="ownChips" class="own-chips"></div>
+        <div id="lateList"></div>
+      </div>
+      <div class="sec">
+        <h2>🟡 곧 챙겨야 할 것 (오늘~이번주) <span class="cnt badge-amber" id="c-soon">0</span></h2>
+        <div id="soonList"></div>
+      </div>
+      <div class="sec">
+        <h2>✓ 완료된 오더 <span class="cnt badge-green" id="c-done">0</span></h2>
+        <div id="doneList"></div>
+      </div>
+    </div>
+
+    <!-- 리스트 -->
+    <div class="page" id="pg-list">
+      <div class="sec">
+        <div class="filters">
+          <input type="text" id="f-search" placeholder="🔍 브랜드·구매처 검색">
+          <select id="f-stage"><option value="">현재 단계 전체</option></select>
+          <select id="f-md"><option value="">담당자 전체</option></select>
+          <select id="f-cat"><option value="">카테고리 전체</option></select>
+          <select id="f-status"><option value="">상태 전체</option><option value="late">지연</option><option value="soon">임박</option><option value="ok">정상</option><option value="done">완료</option></select>
+          <select id="f-sort"><option value="">정렬: 기본순</option><option value="stage">진행 단계순</option><option value="late">지연일 많은순</option><option value="amt">발주금액 큰순</option></select>
+          <span id="f-count" style="font-size:12.5px;color:var(--gray);align-self:center;margin-left:auto"></span>
+        </div>
+        <div class="tbl-wrap">
+          <table id="listTable" class="wide"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 집계 -->
+    <div class="page" id="pg-agg">
+      <div class="stats">
+        <div class="stat navy"><div class="n" id="agg-amt">0</div><div class="l">💰 총 발주금액 (억원)</div></div>
+        <div class="stat amber"><div class="n" id="agg-wait">0</div><div class="l">📦 입고 대기 금액 (억원)</div></div>
+        <div class="stat green"><div class="n" id="agg-qty">0</div><div class="l">총 발주량</div></div>
+        <div class="stat navy"><div class="n" id="agg-cnt">0</div><div class="l">오더 수</div></div>
+      </div>
+      <div class="sec">
+        <h2>🚦 진행상황별 묶인 금액</h2>
+        <table><thead><tr><th>진행상황</th><th>오더수</th><th>발주금액</th><th>비중</th></tr></thead><tbody id="agg-phase"></tbody></table>
+      </div>
+      <div class="sec">
+        <h2>👤 담당자별</h2>
+        <table><thead><tr><th>담당자</th><th>오더수</th><th>발주금액</th></tr></thead><tbody id="agg-md"></tbody></table>
+      </div>
+      <div class="sec">
+        <h2>📅 계절월(12P)별</h2>
+        <table><thead><tr><th>계절월</th><th>오더수</th><th>발주금액</th></tr></thead><tbody id="agg-p12"></tbody></table>
+      </div>
+    </div>
+
+    <!-- 관리자판 (총괄 관제) -->
+    <div class="page" id="pg-admin">
+      <div class="sec" style="display:flex;align-items:center;gap:12px">
+        <b>☁ 클라우드 데이터 관리</b>
+        <span style="font-size:12px;color:var(--gray)">내 화면의 오더 전체를 클라우드에 올려요 (링크로 보는 모두에게 반영)</span>
+        <button class="btn btn-y" style="margin-left:auto" onclick="cloudSaveAll()">☁ 전체 클라우드에 올리기</button>
+      </div>
+      <div class="sec">
+        <h2>👤 MD별 현황 <span style="font-size:11px;color:var(--gray);font-weight:normal">지연 많은 순</span></h2>
+        <table><thead><tr><th>MD</th><th>진행중</th><th>🔴 지연</th><th>🟡 임박</th><th>🟢 정상</th><th>✓ 완료</th><th>발주금액</th><th style="text-align:left">지연 오더</th></tr></thead><tbody id="ad-md"></tbody></table>
+      </div>
+      <div class="sec">
+        <h2>🚧 단계별 병목 <span style="font-size:11px;color:var(--gray);font-weight:normal">지금 오더들이 어느 구간에 멈춰있나</span></h2>
+        <table><thead><tr><th>단계</th><th>구간담당</th><th>대기중</th><th>🔴 지연</th><th>평균 지연</th><th>최대 지연</th></tr></thead><tbody id="ad-stage"></tbody></table>
+      </div>
+      <div class="sec">
+        <h2>📣 알람 보낼 사람별 묶음 <span style="font-size:11px;color:var(--gray);font-weight:normal">버튼 누르면 그 사람에게 보낼 카톡 문구만 복사</span></h2>
+        <div id="ad-owner"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상세 모달 -->
+  <div class="modal" id="modal">
+    <div class="sheet">
+      <div class="hd">
+        <div>
+          <div class="bn" id="m-brand"></div>
+          <div class="meta" id="m-meta"></div>
+        </div>
+        <button class="x" onclick="closeModal()">✕</button>
+      </div>
+      <div class="tl" id="m-timeline"></div>
+      <div id="m-trade"></div>
+      <div class="m-actions adm">
+        <button class="btn btn-o" onclick="editOrder()">✏️ 기본정보 수정</button>
+        <button class="btn btn-o" id="m-cancelBtn" style="color:var(--red)" onclick="cancelOrder()">✕ 오더 취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 신규 오더 모달 -->
+  <div class="modal" id="newModal">
+    <div class="sheet">
+      <div class="hd">
+        <div>
+          <div class="bn">➕ 신규 오더 등록</div>
+          <div class="meta">매입보고 메일을 붙여넣으면 정보를 자동으로 찾아드려요 (선택)</div>
+        </div>
+        <button class="x" onclick="closeNew()">✕</button>
+      </div>
+      <textarea id="mailBox" class="mailbox" placeholder="여기에 매입보고 메일을 통째로 붙여넣으세요 (제목·보낸사람·본문 다 포함되게)"></textarea>
+      <div class="mailrow">
+        <button class="btn btn-o" onclick="fillFromMail()">📋 메일에서 날짜 찾기</button>
+        <span id="mailHint" class="mailhint"></span>
+      </div>
+      <div class="frm">
+        <label>시즌<select id="n-season"><option>26SS</option><option>26FW</option></select></label>
+        <label class="req">지역<select id="n-type" onchange="toggleSubtype()"><option>유럽</option><option>미국</option><option>국내</option></select></label>
+        <label class="req" id="lbl-subtype" style="display:none">유형<select id="n-subtype"><option>일반</option><option>직납</option></select></label>
+        <label class="req">브랜드<input id="n-brand" type="text" placeholder="예: 메종키츠네"></label>
+        <label class="req">담당자(MD)<input id="n-md" type="text" placeholder="예: 한정훈"></label>
+        <label>카테고리<select id="n-cat"><option>남성</option><option>여성</option><option>아동</option></select></label>
+        <label>구매처명<input id="n-vendor" type="text" placeholder="예: SAS JSC"></label>
+        <label>구매그룹<input id="n-pg" type="text" placeholder="예: OBA"></label>
+        <label>발주량<input id="n-qty" type="number" placeholder="0"></label>
+        <label>발주금액(원)<input id="n-amt" type="number" placeholder="0"></label>
+        <label class="req">매입보고일<input id="n-offer" type="date"></label>
+        <label>운송방법<input id="n-ship" type="text" placeholder="예: 해상"></label>
+      </div>
+      <div class="frm-foot">
+        <button class="btn btn-o" onclick="closeNew()">취소</button>
+        <button class="btn btn-y" onclick="saveNewOrder()">등록하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 관리자 로그인 모달 -->
+  <div class="modal" id="loginModal">
+    <div class="sheet" style="width:min(380px,94vw)">
+      <div class="hd">
+        <div>
+          <div class="bn">👤 관리자 로그인</div>
+          <div class="meta">오더 등록·수정 권한이 필요한 경우에만 로그인하세요.<br>(보기만 할 거면 로그인 없이 그대로 쓰면 돼요)</div>
+        </div>
+        <button class="x" onclick="closeLogin()">✕</button>
+      </div>
+      <div class="frm" style="grid-template-columns:1fr">
+        <label>이메일<input id="login-email" type="email" autocomplete="username" placeholder="admin@..."></label>
+        <label>비밀번호<input id="login-pw" type="password" autocomplete="current-password"></label>
+      </div>
+      <div id="login-err" class="login-err"></div>
+      <div class="frm-foot">
+        <button class="btn btn-o" onclick="closeLogin()">취소</button>
+        <button class="btn btn-y" onclick="doLogin()">로그인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 구간담당 설정 모달 -->
+  <div class="modal" id="ownerModal">
+    <div class="sheet" style="width:min(440px,94vw)">
+      <div class="hd">
+        <div>
+          <div class="bn">⚙ 구간담당 설정</div>
+          <div class="meta">단계별 챙길 사람 이름을 입력하세요. MD 단계는 자동으로 오더 담당자에게 가요.</div>
+        </div>
+        <button class="x" onclick="closeOwners()">✕</button>
+      </div>
+      <div class="frm" style="grid-template-columns:1fr" id="ownerForm"></div>
+      <div class="frm-foot">
+        <button class="btn btn-o" onclick="closeOwners()">취소</button>
+        <button class="btn btn-y" onclick="saveOwners()">저장</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ================= 단계 정의 (목표 리드타임 = 직전 단계로부터 목표 소요일) ================= */
+/* 시트의 목표 리드타임 값 기준. baseDate(오퍼접수일)부터 누적 계산 */
+/* 실제 DB 18단계 (글로벌 MDP 관리.xlsx DB시트 C64~C81). lead=직전→해당 목표소요일 */
+/* owner = 구간 담당 (시트 DB R5 담당 라벨 기준. MD=오더 담당자, 그 외 역할은 ⚙설정에서 이름 지정) */
+const STAGES = [
+  {key:'offer',      name:'오퍼',         sub:'바이어→MD',   lead:0,  src:'메일',       owner:'MD'},
+  {key:'feedback',   name:'피드백',       sub:'MD',          lead:1,  src:'메일',       owner:'MD'},
+  {key:'reportStart',name:'매입보고 시작', sub:'MD→대표',     lead:1,  src:'메일',       owner:'MD'},
+  {key:'reportEnd',  name:'매입보고 완료', sub:'대표→MD',     lead:1,  src:'메일',       owner:'대표님'},
+  {key:'draftStart', name:'품의 시작',     sub:'MD',          lead:0,  src:'전자결재',   owner:'MD'},
+  {key:'draftEnd',   name:'품의 완료',     sub:'대표',        lead:1,  src:'전자결재',   owner:'대표님'},
+  {key:'poReq',      name:'PO 요청',       sub:'MD→통합정보', lead:0,  src:'메일',       owner:'MD'},
+  {key:'poGen',      name:'PO 생성',       sub:'통합정보',    lead:1,  src:'통합정보',   owner:'통합정보'},
+  {key:'pay',        name:'결제',          sub:'재무',        lead:6,  src:'전자결재',   owner:'MD'},
+  {key:'pickup',     name:'픽업',          sub:'무역',        lead:7,  src:'무역팀시트', owner:'무역팀'},
+  {key:'ship',       name:'선적',          sub:'무역',        lead:5,  src:'무역팀시트', owner:'무역팀'},
+  {key:'arrive',     name:'입항',          sub:'무역',        lead:60, src:'무역팀시트', owner:'무역팀'},  /* 해상60 기본, 항공2 (analyze에서 운송방법 분기) */
+  {key:'customs',    name:'면허(통관)',    sub:'무역',        lead:1,  src:'무역팀시트', owner:'무역팀'},
+  {key:'inFirst',    name:'최초 입고',     sub:'물류',        lead:3,  src:'물류시트',   owner:'물류팀'},
+  {key:'inspect',    name:'검수 완료',     sub:'물류',        lead:2,  src:'물류시트',   owner:'물류팀'},
+  {key:'inReg',      name:'입고 등록',     sub:'물류/MD',     lead:1,  src:'물류시트',   owner:'물류팀'},
+  {key:'product',    name:'상품화 완료',   sub:'물류',        lead:2,  src:'물류시트',   owner:'물류팀'},
+  {key:'out',        name:'최초 출고',     sub:'물류/BI',     lead:1,  src:'물류시트',   owner:'물류팀'},
+];
+/* 구간 담당 역할 → 실제 사람 이름 (⚙ 설정. 비우면 역할명 그대로 표시) */
+const OWNER_ROLES=['무역팀','물류팀','통합정보','대표님'];   // 결제=MD라 재무는 설정 불필요
+const LS_OWNERS='mdp_owner_names';
+let OWNER_NAMES={}; try{ OWNER_NAMES=JSON.parse(localStorage.getItem(LS_OWNERS)||'{}'); }catch(e){ OWNER_NAMES={}; }
+function resolveOwner(o, step){
+  if(!step) return o.md||'미지정';
+  if(step.owner==='MD') return o.md||'미지정';
+  return OWNER_NAMES[step.owner] || step.owner;   // 이름 미설정 시 역할명("무역팀") 그대로
+}
+/* 오더 유형별 단계 흐름 (해외18 / 국내일반14 / 국내직납11). 단계 구성·순서 다름 */
+/* FLOW 항목: 'key'(STAGES 기본 lead) 또는 {key,lead}(유형별 lead 오버라이드) */
+const FLOWS = {
+  '해외':    ['offer','feedback','reportStart','reportEnd','draftStart','draftEnd','poReq','poGen','pay','pickup','ship','arrive','customs','inFirst','inspect','inReg','product','out'],
+  '국내일반':['offer','feedback','reportStart','reportEnd','draftStart','draftEnd',{key:'inFirst',lead:5},'inspect','poReq','poGen','inReg','product','out',{key:'pay',lead:30}],
+  '국내직납':['offer','feedback','reportStart','reportEnd','draftStart','draftEnd','poReq','poGen',{key:'inReg',lead:7},{key:'pay',lead:30}]
+};
+/* 흐름 판별 = 지역(매입유형: 국내/미국/유럽) + 유형(subType: 일반/직납) 조합. 해외는 무조건 일반 */
+function getOrderType(o){
+  if(o.orderType) return o.orderType;            // 구버전 명시값 하위호환
+  if(o.type==='국내') return (o.subType==='직납') ? '국내직납' : '국내일반';
+  return '해외';                                  // 유럽/미국 = 무조건 해외(일반)
+}
+function getFlow(o){
+  const arr=FLOWS[getOrderType(o)]||FLOWS['해외'];
+  return arr.map(f=>{ const key=(typeof f==='string')?f:f.key; const d=STAGES.find(s=>s.key===key);
+    const lead=(typeof f==='object'&&f.lead!=null)?f.lead:d.lead; return {...d, lead}; });
+}
+function isAir(o){ return /항공|air/i.test(o.ship||''); }  // 운송방법 항공 여부 (입항 리드타임 분기용)
+/* master 매핑 (글로벌 MDP 관리.xlsx master 시트) */
+const MASTER = {
+  season:{ '20261':'26SS','20262':'26SS','20263':'26FW','20264':'26FW','20269':'26FW' },
+  mchCat:{ '1M':'남성','2M':'남성','1W':'여성','2W':'여성','1L':'여성','1K':'아동','1C':'아동' },
+  p12:{ '1':'1월','2':'2월','3':'3월','4':'4월','5':'5월','6':'6월','7':'7월','8':'8월','9':'9월','T':'10월','N':'11월','D':'12월','S':'여름','B':'봄간절기','W':'겨울','F':'가을','A':'풀코드' }
+};
+/* DB 단계날짜 헤더명 → STAGES key (엑셀 파싱용) */
+const DBDATE2KEY = {
+  '오퍼일':'offer','피드백일':'feedback','매입보고 시작일':'reportStart','매입보고 완료일':'reportEnd',
+  '품의 시작일':'draftStart','품의 완료일':'draftEnd','PO 요청일':'poReq','PO 생성일':'poGen',
+  '결제일':'pay','픽업일':'pickup','선적일':'ship','입항일':'arrive','면허일':'customs',
+  '최초 입고일':'inFirst','검수완료일':'inspect','입고등록일':'inReg','상품화 완료일':'product','최초 출고일':'out'
+};
+
+/* ================= 더미 데이터 (프로토타입용 가짜 데이터) ================= */
+/* 실제로는 구글시트/입력에서 옴. actuals = 실제 완료일(YYYY-MM-DD), 안 찍힌 단계는 없음 */
+const TODAY = (()=>{ const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate()); })(); // 실제 오늘 (자정 기준)
+const DUMMY = [
+  {id:1, brand:'47브랜드', md:'한정훈', cat:'남성', type:'유럽', vendor:'Happy Sport Ltd.', pg:'OJA', mch:'1M', p12:'4', season:'26SS', qty:6130, amt:54606919, inQty:6130, inAmt:54606919, buyRate:0.16,
+   actuals:{offer:'2025-10-30',feedback:'2025-11-05',reportStart:'2025-11-27',reportEnd:'2025-11-27',draftStart:'2025-12-02',draftEnd:'2025-12-05',poReq:'2025-12-11',poGen:'2025-12-11',pay:'2025-12-16',pickup:'2025-12-19',ship:'2025-12-30',arrive:'2026-02-22',customs:'2026-02-24',inFirst:'2026-02-27',inspect:'2026-03-09',inReg:'2026-03-11',product:'2026-03-13',out:'2026-03-18'}},
+  {id:2, brand:'메종키츠네', md:'백서현', cat:'여성', type:'유럽', vendor:'SAS JSC', pg:'OIA', mch:'1W', p12:'2', season:'26SS', qty:328, amt:9493262,
+   actuals:{offer:'2026-01-10',feedback:'2026-01-14',reportStart:'2026-01-20',reportEnd:'2026-01-21',draftStart:'2026-01-26',draftEnd:'2026-01-28',poReq:'2026-02-02',poGen:'2026-02-03',pay:'2026-02-10',pickup:'2026-02-14',ship:'2026-02-19'}},
+  {id:3, brand:'오클리', md:'한정훈', cat:'남성', type:'국내', subType:'직납', vendor:'룩소티카', pg:'OJA', mch:'1M', p12:'2', season:'26SS', qty:4026, amt:96325049,
+   actuals:{offer:'2026-05-25',feedback:'2026-05-30'}},
+  {id:4, brand:'나이키', md:'백서현', cat:'남성', type:'유럽', vendor:'Happy Sport Ltd.', pg:'OJA', mch:'1M', p12:'4', season:'26SS', qty:1196, amt:9333189,
+   actuals:{offer:'2026-05-15',feedback:'2026-05-19',reportStart:'2026-05-22',reportEnd:'2026-05-23',draftStart:'2026-05-26',draftEnd:'2026-05-28'}},
+  {id:5, brand:'뉴발란스', md:'한정훈', cat:'남성', type:'국내', vendor:'(주) 이랜드월드패션사업부', pg:'OJB', mch:'1M', p12:'1', season:'26SS', qty:779, amt:38036681,
+   actuals:{offer:'2026-03-20',feedback:'2026-03-24',reportStart:'2026-03-28',reportEnd:'2026-03-29',draftStart:'2026-04-01',draftEnd:'2026-04-03',poReq:'2026-04-08',poGen:'2026-04-09',pay:'2026-04-15',pickup:'2026-04-18',ship:'2026-04-23',arrive:'2026-05-28'}},
+];
+
+/* 저장: localStorage. 없으면 더미로 시작 */
+const LS_ORDERS='mdp_orders_v1';
+function loadOrders(){
+  try{ const s=localStorage.getItem(LS_ORDERS);
+    if(s){ const arr=JSON.parse(s);
+      arr.forEach(o=>{ if(o.actuals){ for(const k in o.actuals){ const v=o.actuals[k]; if(!v||v<'2015-01-01'||v>'2100-12-31') delete o.actuals[k]; } } });
+      return arr; }
+  }catch(e){} return JSON.parse(JSON.stringify(DUMMY));
+}
+function saveOrders(){ try{localStorage.setItem(LS_ORDERS, JSON.stringify(ORDERS));}catch(e){} }
+let ORDERS = loadOrders();
+
+/* ================= 날짜 유틸 ================= */
+function parse(d){ if(!d) return null; const p=d.split('-'); return new Date(+p[0],+p[1]-1,+p[2]); }
+function addDays(dt,n){ const r=new Date(dt); r.setDate(r.getDate()+n); return r; }
+function fmt(dt){ if(!dt) return '-'; return (dt.getMonth()+1)+'/'+dt.getDate(); }
+function fmtY(dt){ if(!dt) return ''; const m=('0'+(dt.getMonth()+1)).slice(-2),d=('0'+dt.getDate()).slice(-2); return dt.getFullYear()+'-'+m+'-'+d; }
+function dDiff(a,b){ return Math.round((a-b)/86400000); }
+
+/* ================= 핵심: 각 건의 단계별 예정일/실제일/상태 계산 ================= */
+function analyze(order){
+  const flow=getFlow(order);  // 오더 유형별 단계 흐름
+  const steps=[];
+  // 시작 단계: 오퍼 있으면 오퍼, 없으면 매입보고 시작(피드백 건너뜀), 둘 다 없으면 첫 기록 단계
+  let firstIdx = flow.findIndex(s=>s.key==='offer' && order.actuals.offer);
+  if(firstIdx<0) firstIdx = flow.findIndex(s=>s.key==='reportStart' && order.actuals.reportStart);
+  if(firstIdx<0) firstIdx = flow.findIndex(s=>order.actuals[s.key]);
+  if(firstIdx<0) firstIdx=0;
+  let prevDate = parse(order.actuals[flow[firstIdx].key]) || TODAY;
+  for(let i=0;i<flow.length;i++){
+    const s=flow[i];
+    const lead = (s.key==='arrive') ? (isAir(order)?2:60) : s.lead;  // 입항=항공2/해상60
+    const planned = (i<firstIdx) ? null : (i===firstIdx ? prevDate : addDays(prevDate, lead));
+    const actual = parse(order.actuals[s.key]);
+    steps.push({...s, planned, actual, isNext:false, isLate:false});
+    if(i>=firstIdx) prevDate = actual || planned; // 실제 있으면 실제 기준(밀림 반영)
+  }
+  // 현재 단계 = 마지막 완료 단계의 다음 (중간에 건너뛴 단계는 완료로 간주 — 예: 상품화 없이 출고된 경우)
+  let lastDoneIdx=-1;
+  for(let i=firstIdx;i<steps.length;i++){ if(steps[i].actual) lastDoneIdx=i; }
+  for(let i=firstIdx;i<lastDoneIdx;i++){ if(!steps[i].actual) steps[i].skipped=true; }  // 건너뛴 단계 표시
+  let nextIdx = (lastDoneIdx<0) ? firstIdx : (lastDoneIdx+1<steps.length ? lastDoneIdx+1 : -1);
+  const allDone = (nextIdx===-1) || !!order.actuals.out || (getOrderType(order)==='국내직납' && !!order.actuals.inReg);  // 출고일(직납은 입고등록) 있으면 완료 — 결제 등 뒷정보 누락 허용
+  let status='ok', lateDays=0, nextStep=null;
+  if(allDone){ status='done'; }
+  else{
+    nextStep = steps[nextIdx];
+    const gap = dDiff(TODAY, nextStep.planned);
+    if(gap>0){ status='late'; lateDays=gap; }       // 예정일 지남 + 미완료 = 현재진행형 지연
+    else if(gap>=-2){ status='soon'; }              // 예정일 2일 전부터 = 임박
+    else { status='ok'; }
+    steps[nextIdx].isNext=true; steps[nextIdx].isLate=(status==='late');
+  }
+  // 최종 전망(보조): 최초 계획 완료일 vs 현재 추세 예상 완료일
+  let planFinal = parse(order.actuals[flow[firstIdx].key]) || TODAY;
+  for(let i=firstIdx+1;i<flow.length;i++){ const s2=flow[i]; const ld2=(s2.key==='arrive')?(isAir(order)?2:60):s2.lead; planFinal=addDays(planFinal, ld2); }
+  const _last=steps[steps.length-1]; const estFinal = _last.actual || _last.planned || planFinal;  // 완료시 실제완료일, 진행중이면 추세 예정일
+  const forecastDelay = dDiff(estFinal, planFinal);              // 최초계획 대비 최종 며칠 늦을 전망
+  const doneCnt = steps.filter(s=>s.actual).length;
+  return {steps, status, lateDays, nextStep, nextIdx, firstIdx, progress:Math.round(doneCnt/flow.length*100), doneCnt, orderType:getOrderType(order), planFinal, estFinal, forecastDelay};
+}
+
+/* ================= 렌더 ================= */
+function renderRadar(){
+  let late=[], soon=[], ok=0, done=0, dones=[];
+  const rmd=document.getElementById('r-md').value;   // 담당자 필터(내 이름)
+  ORDERS.forEach(o=>{ if(o.status==='canceled'){o._a=null;return;} if(rmd&&o.md!==rmd){o._a=null;return;} const a=analyze(o); o._a=a;
+    if(a.status==='late') late.push(o);
+    else if(a.status==='soon') soon.push(o);
+    else if(a.status==='ok') ok++;
+    else { done++; dones.push(o); }
+  });
+  late.sort((x,y)=>y._a.lateDays-x._a.lateDays);
+  const active = ORDERS.filter(o=>o.status!=='canceled'&&(!rmd||o.md===rmd)).length-done;
+  document.getElementById('s-late').textContent=late.length;
+  document.getElementById('s-soon').textContent=soon.length;
+  document.getElementById('s-ok').textContent=ok;
+  document.getElementById('s-all').textContent=active;
+  document.getElementById('s-done').textContent=done;
+  document.getElementById('c-late').textContent=late.length;
+  document.getElementById('c-soon').textContent=soon.length;
+  document.getElementById('c-done').textContent=done;
+
+  // 구간담당별 요약 칩 (지연 건을 "챙길 사람" 기준으로 집계)
+  const ownCnt={};
+  late.forEach(o=>{ const w=resolveOwner(o,o._a.nextStep); ownCnt[w]=(ownCnt[w]||0)+1; });
+  document.getElementById('ownChips').innerHTML = late.length?
+    Object.entries(ownCnt).sort((a,b)=>b[1]-a[1]).map(([w,n])=>`<span>${w} <b>${n}건</b></span>`).join('') : '';
+
+  const ll=document.getElementById('lateList');
+  ll.innerHTML = late.length? late.map(o=>{const a=o._a; const ow=a.nextStep.owner;
+    const owName=resolveOwner(o,a.nextStep);
+    return `
+    <div class="alert r" onclick="openModal(${o.id})">
+      <span class="dot"></span>
+      <div class="a-info"><b>${o.brand}</b><span class="a-sub">${o.season?o.season+'·':''}${o.md}·${o.cat}·${MASTER.p12[o.p12]||o.p12||''}·${(o.qty||0).toLocaleString()}장·${o.amt?(o.amt/1e8).toFixed(2)+'억':''}</span></div>
+      <div class="a-stage"><span class="hot">${a.nextStep.name}</span><span class="own-badge own-${ow}">${owName}</span> <span class="a-dim">예정 ${fmt(a.nextStep.planned)}</span></div>
+      <div class="a-late"><b>${a.lateDays}일</b><br><span class="a-dim">지연</span></div>
+      <div class="act"><button class="btn btn-y" onclick="event.stopPropagation();openModal(${o.id})">완료</button></div>
+    </div>`;}).join('') : '<div class="empty">지연된 건이 없어요 👍</div>';
+
+  const sl=document.getElementById('soonList');
+  sl.innerHTML = soon.length? soon.map(o=>{const a=o._a;const g=dDiff(a.nextStep.planned,TODAY);
+    return `
+    <div class="alert a" onclick="openModal(${o.id})">
+      <span class="dot"></span>
+      <div class="a-info"><b>${o.brand}</b><span class="a-sub">${o.season?o.season+'·':''}${o.md}·${o.cat}·${MASTER.p12[o.p12]||o.p12||''}·${(o.qty||0).toLocaleString()}장</span></div>
+      <div class="a-stage"><span class="hot">${a.nextStep.name}</span><span class="own-badge own-${a.nextStep.owner}">${resolveOwner(o,a.nextStep)}</span> <span class="a-dim">예정 ${fmt(a.nextStep.planned)}</span></div>
+      <div class="a-late"><b>${g===0?'D-0':'D-'+g}</b><br><span class="a-dim">${g===0?'오늘':'예정'}</span></div>
+      <div class="act"><button class="btn btn-y" onclick="event.stopPropagation();openModal(${o.id})">완료</button></div>
+    </div>`;}).join('') : '<div class="empty">이번 주 챙길 게 없어요</div>';
+
+  const dl=document.getElementById('doneList');
+  dl.innerHTML = dones.length? dones.map(o=>{const a=o._a; const ld=a.steps.filter(s=>s.actual).slice(-1)[0];
+    return `<div class="alert" style="background:var(--greenbg)" onclick="openModal(${o.id})">
+      <span class="dot" style="background:var(--green)"></span>
+      <div class="a-info"><b>${o.brand}</b><span class="a-sub">${o.season?o.season+'·':''}${o.md}·${o.cat}·${MASTER.p12[o.p12]||o.p12||''}·${(o.qty||0).toLocaleString()}장</span></div>
+      <div class="a-stage"><span style="color:var(--green);font-weight:bold">✓ 완료</span></div>
+      <div class="a-late"><b style="color:var(--green);font-size:12px">${ld?fmt(ld.actual):''}</b></div>
+      <div class="act"></div>
+    </div>`;}).join('') : '<div class="empty">완료된 오더가 없어요</div>';
+}
+
+function renderList(){
+  const md=document.getElementById('f-md').value, cat=document.getElementById('f-cat').value,
+        st=document.getElementById('f-status').value, q=document.getElementById('f-search').value.trim();
+  const stage=document.getElementById('f-stage').value, sort=document.getElementById('f-sort').value;
+  const baseH=['상태','현재 단계','브랜드','담당자','시즌','매입유형','MCH','구매그룹','카테고리','구매처','12P','발주량','발주금액','입고량','입고금액','매입율'];
+  let h='<thead><tr>'+baseH.map((x,i)=>`<th class="${i<3?'fx fx'+(i+1):''}">${x}</th>`).join('')+STAGES.map(s=>`<th>${s.name}</th>`).join('')+'</tr></thead><tbody>';
+  let list=[];
+  ORDERS.forEach(o=>{
+    const a=analyze(o); o._a=a;
+    const canceled=o.status==='canceled';
+    if(md&&o.md!==md)return; if(cat&&o.cat!==cat)return;
+    if(st&&!canceled&&a.status!==st)return;
+    if(stage){ if(stage==='done'){ if(a.status!=='done')return; } else { if(canceled||!a.nextStep||a.nextStep.key!==stage)return; } }
+    if(q&&!((o.brand||'').includes(q)||(o.vendor||'').includes(q)))return;
+    list.push(o);
+  });
+  // 진행중(0) → 완료(2) → 취소(3) 순. 그 안에서 선택 정렬 or 진행단계순
+  const rank=o=>o.status==='canceled'?3:(o._a.status==='done'?2:0);
+  list.sort((x,y)=>{
+    const r=rank(x)-rank(y); if(r) return r;
+    if(sort==='late') return (y._a.lateDays||0)-(x._a.lateDays||0);
+    if(sort==='amt') return (y.amt||0)-(x.amt||0);
+    return (x._a.nextIdx<0?99:x._a.nextIdx)-(y._a.nextIdx<0?99:y._a.nextIdx);
+  });
+  list.forEach(o=>{
+    const a=o._a; const canceled=o.status==='canceled';
+    let pc,pt;
+    if(canceled){ pc='gray'; pt='취소'; }
+    else { const pm={late:['r','지연'+a.lateDays],soon:['a','임박'],ok:['g','정상'],done:['gray','완료']}; [pc,pt]=pm[a.status]; }
+    const curName=canceled?'취소됨':(a.nextStep?a.nextStep.name+(a.status==='late'?' '+a.lateDays+'일⚠':''):'✓ 완료');
+    const curCls=canceled?'st-na':(a.status==='late'?'st-late':a.status==='soon'?'st-soon':a.status==='done'?'st-done':'');
+    const stepByKey={}; a.steps.forEach(s=>stepByKey[s.key]=s);
+    const cells=STAGES.map(ms=>{
+      const s=stepByKey[ms.key];
+      if(!s) return `<td><span class="st-skip">✕</span></td>`;           // 이 유형은 안 거치는 단계
+      if(s.actual) return `<td><span class="st-done">${fmt(s.actual)}</span></td>`;
+      if(s.skipped) return `<td><span class="st-skip">건너뜀</span></td>`;
+      if(s.isNext && !canceled) return `<td><span class="${s.isLate?'st-late':'st-soon'}">${fmt(s.planned)}</span></td>`;
+      if(s.planned) return `<td><span class="st-plan">${fmt(s.planned)}</span></td>`;
+      return `<td><span class="st-na">·</span></td>`;
+    }).join('');
+    h+=`<tr onclick="openModal(${o.id})">`+
+      `<td class="fx fx1"><span class="pill ${pc}">${pt}</span></td>`+
+      `<td class="fx fx2 l"><span class="${curCls}">${curName}</span></td>`+
+      `<td class="fx fx3 l brand">${o.brand}</td>`+
+      `<td>${o.md||'-'}</td><td>${o.season||'-'}</td><td>${o.type||'-'}</td><td>${o.mch||'-'}</td><td>${o.pg||'-'}</td><td>${o.cat||'-'}</td>`+
+      `<td class="l">${o.vendor||'-'}</td><td>${o.p12||'-'}</td>`+
+      `<td>${(o.qty||0).toLocaleString()}</td><td class="l">${(o.amt||0).toLocaleString()}</td>`+
+      `<td>${(o.inQty||0).toLocaleString()}</td><td class="l">${(o.inAmt||0).toLocaleString()}</td><td>${o.buyRate?((o.buyRate>1?o.buyRate:o.buyRate*100)).toFixed(0)+'%':'-'}</td>`+
+      cells+`</tr>`;
+  });
+  h+='</tbody>';
+  document.getElementById('listTable').innerHTML=h;
+  document.getElementById('f-count').textContent=`${list.length}건`;
+}
+
+/* ================= 알람 수신자 = 지연된 단계의 구간담당 ================= */
+/* MD 단계→오더 담당자 / 무역·물류·통합정보·재무·대표님 단계→⚙설정의 이름 */
+function alarmGroups(all){
+  const rmd=all?'':document.getElementById('r-md').value;   // all=true면 필터 무시(관리자판), 아니면 담당자 필터 적용
+  const by={};
+  ORDERS.filter(o=>o.status!=='canceled'&&(!rmd||o.md===rmd)).forEach(o=>{
+    const a=analyze(o); if(a.status!=='late'&&a.status!=='soon')return;
+    const who=resolveOwner(o,a.nextStep);
+    if(!by[who])by[who]={late:[],soon:[]};
+    by[who][a.status].push({brand:o.brand, season:o.season||'', type:a.orderType, md:o.md||'', stage:a.nextStep.name, days:a.lateDays, due:fmtY(a.nextStep.planned), forecast:a.forecastDelay});
+  });
+  for(const w in by) by[w].late.sort((x,y)=>y.days-x.days);
+  return by;
+}
+
+/* ================= 메일용 내보내기 (파이썬이 읽어 아웃룩 발송) ================= */
+function exportAlarm(){
+  const out={date:fmtY(TODAY), byMd:alarmGroups()};   // byMd 키 이름은 send_mail.py 호환용 (내용은 구간담당 기준)
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob); const aa=document.createElement('a');
+  aa.href=url; aa.download='mdp_alarm.json'; aa.click(); URL.revokeObjectURL(url);
+  alert('메일용 데이터를 내보냈어요 (mdp_alarm.json).\n수신자는 "지연된 단계의 구간담당" 기준이에요.\n담당자_이메일.csv에 무역팀·물류팀 담당 이름도 추가해 주세요.');
+}
+
+/* ================= 카톡 알람 문구 복사 (구간담당별 블록) ================= */
+function copyKakao(){
+  const by=alarmGroups();
+  const whos=Object.keys(by).sort((a,b)=>by[b].late.length-by[a].late.length);
+  if(!whos.length){ alert('지연·임박 건이 없어요 👍'); return; }
+  const blocks=whos.map(w=>{
+    const g=by[w];
+    let t=`🔴[MDP] ${w}님 지연 ${g.late.length}건\n`;
+    g.late.forEach(i=>{ t+=`· ${i.brand}(${i.season?i.season+' ':''}${i.type}${i.md&&i.md!==w?'·'+i.md:''}) ${i.stage} ${i.days}일⚠\n`; });
+    if(g.soon.length){ t+=`🟡 임박 ${g.soon.length}건\n`; g.soon.forEach(i=>{ t+=`· ${i.brand}(${i.season?i.season+' ':''}${i.type}${i.md&&i.md!==w?'·'+i.md:''}) ${i.stage} 예정 ${i.due.slice(5).replace('-','/')}\n`; }); }
+    return t.trim();
+  });
+  const txt=blocks.join('\n\n──────────\n\n');
+  const done=()=>alert('구간담당별 카톡 문구를 복사했어요! (받는 사람별로 잘라서 보내세요) 👇\n\n'+txt);
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done, done); }
+  else done();
+}
+
+/* ================= 관리자판 (총괄 관제) ================= */
+function renderAdmin(){
+  const live=ORDERS.filter(o=>o.status!=='canceled');
+  live.forEach(o=>o._a=analyze(o));
+  // A. MD별 현황
+  const mds={};
+  live.forEach(o=>{
+    const m=o.md||'미지정';
+    if(!mds[m]) mds[m]={cnt:0,late:0,soon:0,ok:0,done:0,amt:0,lateList:[]};
+    const g=mds[m]; g.amt+=(o.amt||0);
+    const st=o._a.status;
+    if(st==='done'){ g.done++; return; }
+    g.cnt++;
+    if(st==='late'){ g.late++; g.lateList.push(`${o.brand}·${o._a.nextStep.name} ${o._a.lateDays}일`); }
+    else if(st==='soon') g.soon++;
+    else g.ok++;
+  });
+  document.getElementById('ad-md').innerHTML = Object.entries(mds)
+    .sort((a,b)=>b[1].late-a[1].late || b[1].amt-a[1].amt)
+    .map(([m,g])=>`<tr><td><b>${m}</b></td><td>${g.cnt}</td>`+
+      `<td>${g.late?`<span class="pill r">${g.late}</span>`:'-'}</td>`+
+      `<td>${g.soon?`<span class="pill a">${g.soon}</span>`:'-'}</td>`+
+      `<td>${g.ok||'-'}</td><td>${g.done||'-'}</td><td>${(g.amt/1e8).toFixed(1)}억</td>`+
+      `<td style="text-align:left;font-size:11.5px;color:var(--red)">${g.lateList.join(' / ')||'-'}</td></tr>`).join('');
+  // B. 단계별 병목 (현재 그 단계에서 대기 중인 오더)
+  const stg={};
+  live.forEach(o=>{
+    const a=o._a; if(a.status==='done'||!a.nextStep) return;
+    const k=a.nextStep.key;
+    if(!stg[k]) stg[k]={wait:0,late:0,days:[]};
+    stg[k].wait++;
+    if(a.status==='late'){ stg[k].late++; stg[k].days.push(a.lateDays); }
+  });
+  document.getElementById('ad-stage').innerHTML = STAGES
+    .filter(s=>stg[s.key])
+    .sort((a,b)=>(stg[b.key].late-stg[a.key].late)||(stg[b.key].wait-stg[a.key].wait))
+    .map(s=>{ const g=stg[s.key];
+      const avg=g.days.length?Math.round(g.days.reduce((x,y)=>x+y,0)/g.days.length):0;
+      const mx=g.days.length?Math.max(...g.days):0;
+      return `<tr><td><b>${s.name}</b></td><td><span class="own-badge own-${s.owner}">${s.owner==='MD'?'MD':(OWNER_NAMES[s.owner]||s.owner)}</span></td>`+
+        `<td>${g.wait}</td><td>${g.late?`<span class="pill r">${g.late}</span>`:'-'}</td>`+
+        `<td>${avg?avg+'일':'-'}</td><td>${mx?`<b style="color:var(--red)">${mx}일</b>`:'-'}</td></tr>`; }).join('')
+    || '<tr><td colspan="6" class="empty">진행 중인 오더가 없어요</td></tr>';
+  // C. 알람 보낼 사람별 묶음 (전체 기준, 대시보드 필터 무시)
+  const by=alarmGroups(true);
+  const whos=Object.keys(by).sort((a,b)=>by[b].late.length-by[a].late.length);
+  document.getElementById('ad-owner').innerHTML = whos.length? whos.map(w=>{
+    const g=by[w];
+    const lines=g.late.map(i=>`<div style="padding:3px 0;font-size:12.5px">🔴 ${i.brand}(${i.season?i.season+' ':''}${i.type}${i.md&&i.md!==w?'·'+i.md:''}) <b>${i.stage}</b> <b style="color:var(--red)">${i.days}일⚠</b></div>`).join('')
+      + g.soon.map(i=>`<div style="padding:3px 0;font-size:12.5px;color:#92690a">🟡 ${i.brand}(${i.season?i.season+' ':''}${i.type}${i.md&&i.md!==w?'·'+i.md:''}) ${i.stage} 예정 ${i.due.slice(5).replace('-','/')}</div>`).join('');
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <b style="font-size:14px">${w}</b>
+        <span style="font-size:11.5px;color:var(--gray)">지연 ${g.late.length}건 · 임박 ${g.soon.length}건</span>
+        <button class="btn btn-y" style="margin-left:auto" onclick="copyOwnerKakao('${w}')">📋 ${w}님 카톡 복사</button>
+      </div>${lines}</div>`;
+  }).join('') : '<div class="empty">지연·임박 건이 없어요 👍</div>';
+}
+function copyOwnerKakao(w){
+  const g=alarmGroups(true)[w]; if(!g) return;
+  let t=`🔴[MDP] ${w}님 지연 ${g.late.length}건\n`;
+  g.late.forEach(i=>{ t+=`· ${i.brand}(${i.season?i.season+' ':''}${i.type}${i.md&&i.md!==w?'·'+i.md:''}) ${i.stage} ${i.days}일⚠\n`; });
+  if(g.soon.length){ t+=`🟡 임박 ${g.soon.length}건\n`; g.soon.forEach(i=>{ t+=`· ${i.brand}(${i.season?i.season+' ':''}${i.type}${i.md&&i.md!==w?'·'+i.md:''}) ${i.stage} 예정 ${i.due.slice(5).replace('-','/')}\n`; }); }
+  t=t.trim();
+  const done=()=>alert(w+'님께 보낼 카톡 문구를 복사했어요 👇\n\n'+t);
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(done, done); }
+  else done();
+}
+
+/* ================= 구간담당 설정 ================= */
+function openOwners(){
+  document.getElementById('ownerForm').innerHTML = OWNER_ROLES.map(r=>
+    `<label>${r} 담당 이름<input id="own-${r}" type="text" placeholder="예: 홍길동 (비우면 '${r}'로 표시)" value="${OWNER_NAMES[r]||''}"></label>`).join('');
+  document.getElementById('ownerModal').classList.add('on');
+}
+function closeOwners(){ document.getElementById('ownerModal').classList.remove('on'); }
+function saveOwners(){
+  OWNER_ROLES.forEach(r=>{ const v=document.getElementById('own-'+r).value.trim(); if(v) OWNER_NAMES[r]=v; else delete OWNER_NAMES[r]; });
+  try{localStorage.setItem(LS_OWNERS, JSON.stringify(OWNER_NAMES));}catch(e){}
+  cloudSaveSettings();
+  closeOwners(); renderRadar();
+  alert('구간담당을 저장했어요. 대시보드 배지와 알람 문구에 바로 반영돼요.');
+}
+
+/* ================= 집계 ================= */
+function won(n){ return (n/1e8).toFixed(1); }
+function phaseGroup(o){ if(o.actuals.out) return '출고완료'; if(o.actuals.inFirst) return '출고전'; if(o.actuals.draftEnd) return '입고전'; return '품의전'; }
+function groupSum(list, keyFn){ const m={}; list.forEach(o=>{const k=keyFn(o)||'-'; if(!m[k])m[k]={cnt:0,amt:0}; m[k].cnt++; m[k].amt+=(o.amt||0);}); return Object.entries(m).sort((a,b)=>b[1].amt-a[1].amt); }
+function renderAgg(){
+  const live=ORDERS.filter(o=>o.status!=='canceled');
+  const totAmt=live.reduce((s,o)=>s+(o.amt||0),0), totQty=live.reduce((s,o)=>s+(o.qty||0),0);
+  const waitAmt=live.filter(o=>!o.actuals.inFirst).reduce((s,o)=>s+(o.amt||0),0);
+  document.getElementById('agg-amt').textContent=won(totAmt);
+  document.getElementById('agg-wait').textContent=won(waitAmt);
+  document.getElementById('agg-qty').textContent=totQty.toLocaleString();
+  document.getElementById('agg-cnt').textContent=live.length;
+  const phases=['품의전','입고전','출고전','출고완료']; const pg={}; phases.forEach(p=>pg[p]={cnt:0,amt:0});
+  live.forEach(o=>{const g=phaseGroup(o); pg[g].cnt++; pg[g].amt+=(o.amt||0);});
+  document.getElementById('agg-phase').innerHTML=phases.map(p=>`<tr><td><b>${p}</b></td><td>${pg[p].cnt}</td><td>${pg[p].amt.toLocaleString()}원</td><td>${totAmt?Math.round(pg[p].amt/totAmt*100):0}%</td></tr>`).join('');
+  document.getElementById('agg-md').innerHTML=groupSum(live,o=>o.md).map(([k,v])=>`<tr><td>${k||'-'}</td><td>${v.cnt}</td><td>${v.amt.toLocaleString()}원</td></tr>`).join('');
+  document.getElementById('agg-p12').innerHTML=groupSum(live,o=>MASTER.p12[o.p12]||o.p12).map(([k,v])=>`<tr><td>${k||'-'}</td><td>${v.cnt}</td><td>${v.amt.toLocaleString()}원</td></tr>`).join('');
+}
+
+/* ================= 상세 모달 ================= */
+let curId=null;
+function openModal(id){
+  curId=id; const o=ORDERS.find(x=>x.id===id); const a=analyze(o);
+  document.getElementById('m-brand').textContent=o.brand;
+  document.getElementById('m-meta').innerHTML=`<span class="otype-badge ot-${a.orderType}">${a.orderType}</span> ${o.season?o.season+' · ':''}${o.md} · ${o.cat} · ${o.vendor} · 발주 ${(o.qty||0).toLocaleString()}`+(a.status!=='done'&&a.forecastDelay>0?` · <b style="color:var(--red)">📅 최종 ${a.forecastDelay}일 지연 전망</b>`:'');
+  const tl=document.getElementById('m-timeline');
+  tl.innerHTML=a.steps.map((s,i)=>{
+    let cls='', dateHtml='';
+    if(s.actual){ cls='done';
+      dateHtml=`<span class="act">✓ ${fmt(s.actual)} 완료</span>`+(s.planned?` <span class="plan">(예정 ${fmt(s.planned)})</span>`:'');
+    }else if(s.skipped){
+      dateHtml=`<span class="plan">⊘ 건너뜀 (생략된 단계)</span>`;
+    }else if(i<a.firstIdx){
+      dateHtml=`<span class="plan">— 해당 없음 —</span>`;
+    }else if(i===a.nextIdx){
+      const gap=dDiff(TODAY,s.planned);
+      if(gap>0){ cls='late'; dateHtml=`<span class="plan">예정 ${fmt(s.planned)}</span> <span class="lateT">· ${gap}일 지연중</span>`; }
+      else { cls='next'; dateHtml=`<span class="plan">예정 ${fmt(s.planned)}</span> <span style="color:#f59e0b">· ${gap===0?'오늘':(-gap)+'일 뒤'}</span>`; }
+    }else{
+      dateHtml=`<span class="plan">예정 ${fmt(s.planned)}</span>`;
+    }
+    return `<div class="step ${cls}">
+      <div class="mk"></div>
+      <div class="sname">${s.name}<small>${s.sub||s.src}</small></div>
+      <div class="sdate">${dateHtml}</div>
+      <div class="sin adm">
+        ${s.actual? '' : `<input type="date" id="in-${s.key}"><button class="miniY" onclick="setDate('${s.key}')">기록</button>`}
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('m-trade').innerHTML = tradeSectionHtml(o) + logisSectionHtml(o);
+  document.getElementById('m-cancelBtn').textContent = o.status==='canceled'?'↩ 취소 해제':'✕ 오더 취소';
+  document.getElementById('modal').classList.add('on');
+}
+function setDate(key){
+  const v=document.getElementById('in-'+key).value;
+  const o=ORDERS.find(x=>x.id===curId);
+  o.actuals[key]= v || fmtY(TODAY); // 비어있으면 오늘 날짜로
+  saveOrders(); cloudSaveOrder(o); openModal(curId); renderRadar(); renderList();
+}
+function closeModal(){ document.getElementById('modal').classList.remove('on'); }
+
+/* ================= 오더 수정 / 취소 ================= */
+let editId=null;
+function cancelOrder(){
+  const o=ORDERS.find(x=>x.id===curId); if(!o) return;
+  if(o.status==='canceled'){ o.status=''; alert('취소를 해제했어요.'); }
+  else { o.status='canceled'; alert('"'+o.brand+'" 오더를 취소 처리했어요.\n(삭제 아님 — 이력은 리스트에 남아있어요)'); }
+  saveOrders(); cloudSaveOrder(o); closeModal(); renderRadar(); renderList();
+}
+function editOrder(){
+  editId=curId; const o=ORDERS.find(x=>x.id===curId);
+  closeModal(); openNew();
+  const v=(id,val)=>document.getElementById(id).value=val;
+  v('n-brand',o.brand); v('n-md',o.md); v('n-cat',o.cat||'남성'); v('n-type',o.type||'유럽');
+  v('n-vendor',o.vendor==='-'?'':o.vendor); v('n-pg',o.pg||''); v('n-qty',o.qty||''); v('n-amt',o.amt||''); v('n-ship',o.ship||'');
+  v('n-subtype', o.subType||'일반'); toggleSubtype();
+  v('n-season', o.season||'26SS');
+  v('n-offer', o.actuals.reportStart||o.actuals.offer||fmtY(TODAY));
+  document.querySelector('#newModal .bn').textContent='✏️ 오더 수정';
+}
+
+/* ================= 신규 오더 등록 ================= */
+function toggleSubtype(){ document.getElementById('lbl-subtype').style.display = (document.getElementById('n-type').value==='국내')?'flex':'none'; }
+function openNew(){
+  document.querySelector('#newModal .bn').textContent='➕ 신규 오더 등록';
+  ['n-brand','n-md','n-vendor','n-pg','n-qty','n-amt','n-ship'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('mailBox').value=''; document.getElementById('mailHint').textContent='';
+  document.getElementById('n-offer').value=fmtY(TODAY);
+  document.getElementById('n-type').value='유럽'; toggleSubtype();
+  document.getElementById('newModal').classList.add('on');
+}
+function closeNew(){ document.getElementById('newModal').classList.remove('on'); }
+function fillFromMail(){
+  const t=document.getElementById('mailBox').value; let m; const got=[];
+  const set=(id,v)=>{ if(v){ document.getElementById(id).value=v; return true;} return false; };
+  // 매입보고일: 시간(14:58) 동반 날짜 우선 → 일반 YYYY-MM-DD → M/D
+  let date=null;
+  if((m=t.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})\s+\d{1,2}:\d{2}/))) date=`${m[1]}-${('0'+m[2]).slice(-2)}-${('0'+m[3]).slice(-2)}`;
+  else if((m=t.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/))) date=`${m[1]}-${('0'+m[2]).slice(-2)}-${('0'+m[3]).slice(-2)}`;
+  else if((m=t.match(/(\d{1,2})\s*[월\/]\s*(\d{1,2})/))) date=`2026-${('0'+m[1]).slice(-2)}-${('0'+m[2]).slice(-2)}`;
+  if(date && set('n-offer',date)) got.push('매입보고일');
+  // 매입유형: [국내매입]/[유럽매입]/[미국매입]
+  if((m=t.match(/\[?\s*(국내|유럽|미국)\s*매입/))){ document.getElementById('n-type').value=m[1]; got.push('매입유형'); }
+  // 발주량: 705pcs
+  if((m=t.match(/([\d,]+)\s*pcs/i)) && set('n-qty', m[1].replace(/,/g,''))) got.push('발주량');
+  // 담당자: "○○○ 올림/드림" 우선 → 직급 동반(차장 제외=경칭일 수 있음)
+  if((m=t.match(/([가-힣]{2,4})\s*(올림|드림)/))){ set('n-md', m[1]); got.push('담당자'); }
+  else if((m=t.match(/([가-힣]{2,4})\s*(과장|대리|부장|사원|팀장|매니저)/))){ set('n-md', m[1]); got.push('담당자'); }
+  // 브랜드: 제목 "...브랜드(ENG)매입보고" → 매입보고 직전 토큰 / 본문 "ENG 브랜드"
+  if((m=t.match(/([가-힣A-Za-z][가-힣A-Za-z()]*?)\s*매입보고/))){ set('n-brand', m[1].trim()); got.push('브랜드'); }
+  else if((m=t.match(/([A-Za-z]{2,})\s*브랜드/))){ set('n-brand', m[1]); got.push('브랜드'); }
+  const h=document.getElementById('mailHint');
+  if(got.length){ h.style.color='var(--green)'; h.textContent='✓ 자동 추출: '+got.join(' · ')+' (확인·수정 후 등록)'; }
+  else { h.style.color='var(--red)'; h.textContent='추출하지 못했어요. 직접 입력해 주세요.'; }
+}
+function saveNewOrder(){
+  const g=id=>document.getElementById(id).value;
+  const brand=g('n-brand').trim(), md=g('n-md').trim(), offer=g('n-offer');
+  if(!brand||!md||!offer){ alert('브랜드·담당자·매입보고일은 꼭 입력해 주세요.'); return; }
+  const base={brand, md, type:g('n-type'), subType:(g('n-type')==='국내'?g('n-subtype'):''), season:g('n-season'), cat:g('n-cat'), vendor:g('n-vendor')||'-', pg:g('n-pg'),
+    qty:+g('n-qty')||0, amt:+g('n-amt')||0, ship:g('n-ship')};
+  if(editId!=null){
+    const o=ORDERS.find(x=>x.id===editId); Object.assign(o, base);
+    if(!o.actuals.reportStart && !o.actuals.offer) o.actuals.reportStart=offer;
+    editId=null; saveOrders(); cloudSaveOrder(o); closeNew(); renderRadar(); renderList();
+    alert('"'+brand+'" 오더를 수정했어요.'); return;
+  }
+  const id=(ORDERS.reduce((a,o)=>Math.max(a,o.id),0)||0)+1;
+  const newO={id, ...base, actuals:{reportStart:offer}};
+  ORDERS.push(newO);
+  if(![...document.getElementById('f-md').options].some(o=>o.value===md))
+    document.getElementById('f-md').insertAdjacentHTML('beforeend',`<option>${md}</option>`);
+  saveOrders(); cloudSaveOrder(newO); closeNew(); renderRadar(); renderList();
+  alert('"'+brand+'" 오더가 등록됐어요! 대시보드에서 진행을 추적할 수 있어요.');
+}
+
+/* ================= 발주현황 엑셀 올리기 ================= */
+function num(v){ if(v==null) return 0; const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+function cleanP12(v){ if(v==null) return ''; return String(v).trim().replace(/\.0+$/,''); }
+function normDate(v){
+  if(v==null||v==='') return null;
+  let y,mo,d;
+  if(v instanceof Date){ y=v.getFullYear(); mo=v.getMonth()+1; d=v.getDate(); }
+  else { const s=String(v); let m;
+    if((m=s.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/))){ y=+m[1]; mo=+m[2]; d=+m[3]; }
+    else if((m=s.match(/(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})/))){ y=m[3].length===2?2000+(+m[3]):+m[3]; mo=+m[1]; d=+m[2]; }
+    else return null;
+  }
+  if(y<2015 || y>2100) return null; // 엑셀 빈날짜(1899/1900) 등 비정상 제외
+  return `${y}-${('0'+mo).slice(-2)}-${('0'+d).slice(-2)}`;
+}
+function rebuildFilters(){
+  const mdSel=document.getElementById('f-md'), catSel=document.getElementById('f-cat');
+  const mds=[...new Set(ORDERS.map(o=>o.md).filter(Boolean))].sort();
+  const cats=[...new Set(ORDERS.map(o=>o.cat).filter(Boolean))];
+  mdSel.innerHTML='<option value="">담당자 전체</option>'+mds.map(m=>`<option>${m}</option>`).join('');
+  catSel.innerHTML='<option value="">카테고리 전체</option>'+cats.map(c=>`<option>${c}</option>`).join('');
+}
+function handleUpload(ev){
+  const f=ev.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+      const ws=wb.Sheets['DB']; if(!ws){ alert("'DB' 시트를 찾을 수 없어요. 파일을 확인해 주세요."); return; }
+      const rows=XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:null});
+      const C=n=>n-1;
+      // R6(0-base 5행)에서 단계날짜 컬럼 위치 자동 탐색
+      const hdr=(rows[5]||[]).map(x=>x==null?'':String(x).replace(/\s+/g,' ').trim());
+      const stageCol={};
+      hdr.forEach((h,i)=>{ if(DBDATE2KEY[h]) stageCol[DBDATE2KEY[h]]=i; });
+      const out=[]; let nid=1;
+      for(let r=7;r<rows.length;r++){
+        const row=rows[r]; if(!row) continue;
+        const brand=row[C(11)];
+        if(brand==null || String(brand).trim()==='') continue;
+        const q=num(row[C(13)]), a=num(row[C(14)]);
+        const actuals={};
+        for(const k in stageCol){ const d=normDate(row[stageCol[k]]); if(d) actuals[k]=d; }
+        if(q<=0 && a<=0 && !Object.keys(actuals).length) continue; // 노이즈·빈 행 제외
+        const mch=row[C(6)]==null?'':String(row[C(6)]).trim();
+        let cat=row[C(8)]==null?'':String(row[C(8)]).trim();
+        if(!cat && MASTER.mchCat[mch]) cat=MASTER.mchCat[mch];
+        out.push({ id:nid++, brand:String(brand).trim(),
+          md:(row[C(9)]||'').toString().trim(), cat, type:(row[C(5)]||'').toString().trim(),
+          vendor:(row[C(10)]||'-').toString().trim(), pg:(row[C(7)]||'').toString().trim(),
+          mch, p12:cleanP12(row[C(12)]), season:(row[C(2)]||'').toString().trim(),
+          qty:q, amt:a, inQty:num(row[C(15)]), inAmt:num(row[C(16)]), buyRate:num(row[C(17)]), actuals });
+      }
+      if(!out.length){ alert('오더를 찾지 못했어요. DB 시트의 데이터 위치를 확인해 주세요.'); return; }
+      ORDERS=out; saveOrders(); rebuildFilters(); renderRadar(); renderAgg(); renderList();
+      alert(out.length+'건의 오더를 불러왔어요! 🎉');
+      if(IS_ADMIN && confirm('이 데이터를 클라우드에도 올릴까요?\n(올리면 링크로 보는 모든 사람에게 반영돼요)')) cloudSaveAll();
+    }catch(err){ alert('파일 읽기 오류: '+err.message); }
+    finally{ ev.target.value=''; }
+  };
+  rd.readAsArrayBuffer(f);
+}
+
+/* ================= 무역팀 구글시트 자동 연동 ================= */
+/* 무역팀 관리판이 "링크 열람 가능"이라 로그인 없이 CSV로 직접 읽음 (업로드 불필요) */
+const TRADE_SHEET_ID='1nNpEle15mIWK-AJlOZ1mxtk2mq14t5-9JDSeT-ay2-w';
+const TRADE_TABS=['리테일-선적리스트','리테일-통관완료건'];
+const LS_TRADE='mdp_trade_v1';
+/* 물류 칸반(오산패션물류) 시트 — 마찬가지로 링크 열람이라 직접 읽음 */
+const LOGIS_SHEET_ID='14x0II10Vh9H3TRO_cBqUF3Lg03PXSkJMEEEh19vc5hE';
+const LOGIS_GID='1034810701';
+const LS_LOGIS='mdp_logis_v1';
+function loadLS(key){ try{const s=localStorage.getItem(key); if(s) return JSON.parse(s);}catch(e){} return {fetched:'',rows:[]}; }
+let TRADE=loadLS(LS_TRADE);
+let LOGIS=loadLS(LS_LOGIS);
+function nowStamp(){ const n=new Date(); const p=x=>('0'+x).slice(-2); return `${p(n.getMonth()+1)}/${p(n.getDate())} ${p(n.getHours())}:${p(n.getMinutes())}`; }
+function updateTradeInfo(){
+  const parts=[];
+  if(TRADE.fetched) parts.push('무역 '+TRADE.rows.length+'건');
+  if(LOGIS.fetched) parts.push('물류 '+LOGIS.rows.length+'건');
+  document.getElementById('tradeInfo').textContent = parts.length? parts.join(' · ')+` (${TRADE.fetched||LOGIS.fetched})` : '무역·물류 시트: 미연결';
+}
+async function fetchCsv(url){
+  const res=await fetch(url);
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const text=await res.text();
+  const wb=XLSX.read(text,{type:'string'});                           // SheetJS가 따옴표·줄바꿈 포함 CSV 안전 파싱
+  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:null});
+}
+async function fetchTradeCore(){
+  const rows=[];
+  for(const tab of TRADE_TABS){
+    const arr=await fetchCsv(`https://docs.google.com/spreadsheets/d/${TRADE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`+encodeURIComponent(tab));
+    const hdr=(arr[0]||[]).map(x=>String(x||'').trim());
+    const ix={}; hdr.forEach((h,i)=>{ if(!(h in ix)) ix[h]=i; });
+    const get=(row,name)=> ix[name]==null ? null : row[ix[name]];
+    for(let r=1;r<arr.length;r++){
+      const row=arr[r]; if(!row) continue;
+      let tn=String(get(row,'무역번호')||'').trim(); if(!tn) continue;
+      tn=tn.split(/[\s→]+/)[0];                                       // "FAB...096 →FAB...098" 같은 변경표기는 첫 번호만
+      const m=tn.match(/^FA([A-Z]{3})P/);
+      rows.push({ tn, pg:m?m[1]:'', tab,
+        brand:String(get(row,'브랜드')||'').trim(), md:String(get(row,'MD')||'').trim(),
+        pickup:normDate(get(row,'EX-픽업일자')), ship:normDate(get(row,'ETD')),
+        arrive:normDate(get(row,'ETA')), customs:normDate(get(row,'면허일')),
+        inspectEnd:normDate(get(row,'검수종료')), gr:normDate(get(row,'GR일자')) });
+    }
+  }
+  TRADE={fetched:nowStamp(), rows};
+  try{localStorage.setItem(LS_TRADE, JSON.stringify(TRADE));}catch(e){}
+}
+async function fetchLogisCore(){
+  const arr=await fetchCsv(`https://docs.google.com/spreadsheets/d/${LOGIS_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${LOGIS_GID}`);
+  const hdr=(arr[0]||[]).map(x=>String(x||'').replace(/\s+/g,' ').trim());
+  const find=(...keys)=>{ for(const k of keys){ const i=hdr.findIndex(h=>h.includes(k)); if(i>=0) return i; } return -1; };
+  const ci={ brand:find('브랜드'), planIn:find('입고 예정일'), inFirst:find('실입고일'), inspect:find('검수일'),
+             qty:find('PCS'), out:find('최초 출고일'), sap:find('SAP 확정 확정일','확정일') };  // SAP 확정일 = 입고등록일 (사용자 확인)
+  let prod=-1; const p12i=find('상품화 12P','12P');                    // 상품화 완료일 = '상품화 12P' 바로 뒤의 '완료일'
+  for(let i=(p12i>=0?p12i+1:0); i<hdr.length; i++){ if(hdr[i]==='완료일'){ prod=i; break; } }
+  const dateOf=v=> v==null?null:normDate(typeof v==='string'? v.replace(/\s+/g,''):v);  // "2025. 1. 17" 공백 제거
+  const rows=[];
+  for(let r=1;r<arr.length;r++){
+    const row=arr[r]; if(!row) continue;
+    const vendor=String(row[0]||'').trim();
+    const brand=ci.brand>=0?String(row[ci.brand]||'').trim():'';
+    if(!vendor && !brand) continue;
+    const o={ vendor, brand,
+      planIn:dateOf(row[ci.planIn]), inFirst:dateOf(row[ci.inFirst]), inspect:dateOf(row[ci.inspect]),
+      inReg:ci.sap>=0?dateOf(row[ci.sap]):null,
+      product:prod>=0?dateOf(row[prod]):null, out:ci.out>=0?dateOf(row[ci.out]):null,
+      qty:ci.qty>=0?num(row[ci.qty]):0 };
+    if(!o.planIn && !o.inFirst) continue;                              // 날짜 없는 노이즈 행 제외
+    o.key=[vendor,brand,o.inFirst||o.planIn||'',o.qty||''].join('|');  // 칸반엔 고유번호가 없어 조합키 사용
+    rows.push(o);
+  }
+  LOGIS={fetched:nowStamp(), rows};
+  try{localStorage.setItem(LS_LOGIS, JSON.stringify(LOGIS));}catch(e){}
+}
+async function refreshSheets(silent){
+  const btn=document.getElementById('btnTrade'); btn.textContent='🔄 읽어오는 중…';
+  const ok=[], bad=[];
+  try{ await fetchTradeCore(); ok.push('무역 '+TRADE.rows.length+'건'); }catch(e){ bad.push('무역팀('+e.message+')'); }
+  try{ await fetchLogisCore(); ok.push('물류 '+LOGIS.rows.length+'건'); }catch(e){ bad.push('물류 칸반('+e.message+')'); }
+  updateTradeInfo();
+  btn.textContent='🔄 무역·물류 새로고침';
+  if(!silent){
+    let msg = ok.length? '읽어왔어요! 🔄 '+ok.join(' · ') : '';
+    if(bad.length) msg += (msg?'\n':'')+'⚠ 실패: '+bad.join(', ')+'\n(인터넷 연결 또는 시트 공유설정 확인)';
+    alert(msg||'읽어오지 못했어요.');
+  }
+  if(curId!=null && document.getElementById('modal').classList.contains('on')) openModal(curId);
+}
+/* ── 오더 ↔ 무역행 매칭 ── */
+const BRAND_ALIAS={'메종키츠네':'MAISONKITSUNE','노스페이스':'NORTHFACE','뉴발란스':'NEWBALANCE','뉴에라':'NEWERA','나이키':'NIKE','아디다스':'ADIDAS','이자벨마랑':'ISABELMARANT','자딕앤볼테르':'ZADIGVOLTAIRE','띠어리':'THEORY','마쥬':'MAJE','산드로':'SANDRO','롱샴':'LONGCHAMP','아르켓':'ARKET','타미힐피거':'TOMMYHILFIGER','리바이스':'LEVIS','빈스':'VINCE','킵링':'KIPLING'};
+function bNorm(s){ return String(s||'').replace(/[^0-9A-Za-z가-힣]/g,'').toUpperCase(); }
+function pgNorm(s){ return String(s||'').toUpperCase().replace(/[^A-Z]/g,'').split('').sort().join(''); }  // OYA↔OAY 표기차 흡수
+function brandForms(s){ const n=bNorm(s); const out=[n];
+  for(const k in BRAND_ALIAS){ const kk=bNorm(k), vv=BRAND_ALIAS[k];
+    if(n.includes(kk)) out.push(vv);
+    if(n.includes(vv)) out.push(kk); }
+  return out; }
+function brandHit(a,b){ const A=brandForms(a), B=brandForms(b);
+  return A.some(x=>B.some(y=>x&&y&&(x===y||x.includes(y)||y.includes(x)))); }
+function tradeCandidates(o){
+  if(getOrderType(o)!=='해외' || !TRADE.rows.length) return [];
+  const linked=o.tradeNos||[];
+  const pgo=pgNorm(o.pg);
+  let cands=TRADE.rows.filter(t=>brandHit(o.brand,t.brand) && (!pgo||!t.pg||pgNorm(t.pg)===pgo));
+  if(!cands.length) cands=TRADE.rows.filter(t=>brandHit(o.brand,t.brand));   // 구매그룹 표기 불일치 대비
+  const a=analyze(o);
+  const ref = parse(o.actuals.ship) || ((a.steps.find(s=>s.key==='ship')||{}).planned);  // 선적 시점 근접순
+  cands=cands.slice();
+  cands.sort((x,y)=>{
+    const lx=linked.includes(x.tn)?0:1, ly=linked.includes(y.tn)?0:1; if(lx!==ly) return lx-ly;
+    if(!ref) return 0;
+    const dx=x.ship?Math.abs(parse(x.ship)-ref):9e15, dy=y.ship?Math.abs(parse(y.ship)-ref):9e15;
+    return dx-dy;
+  });
+  return cands.slice(0,8);
+}
+/* 연결된 무역행 여러 개 → 단계 날짜 통합: 시작 성격(픽업·선적)=가장 이른, 도착 성격(입항·면허)=가장 늦은 */
+const TRADE_RULE=[['pickup','min'],['ship','min'],['arrive','max'],['customs','max']];
+function tradeDates(o){
+  const rows=TRADE.rows.filter(t=>(o.tradeNos||[]).includes(t.tn));
+  if(!rows.length) return null;
+  const out={};
+  TRADE_RULE.forEach(([k,rule])=>{
+    const ds=rows.map(r=>r[k]).filter(Boolean).sort();
+    if(ds.length) out[k]= rule==='min'?ds[0]:ds[ds.length-1];
+  });
+  return out;
+}
+function tradeSectionHtml(o){
+  if(getOrderType(o)!=='해외') return '';
+  if(!TRADE.rows.length) return `<div class="trade-sec"><h3>🚢 무역팀 시트</h3><div class="empty">아직 무역팀 데이터가 없어요. 사이드바 "🚢 무역팀 새로고침"을 눌러주세요.</div></div>`;
+  const linked=o.tradeNos||[];
+  const cands=tradeCandidates(o);
+  let h=`<div class="trade-sec"><h3>🚢 무역팀 시트 연결 <small>(${TRADE.fetched} 읽음 · 이 오더의 무역 건을 골라 연결하세요)</small></h3>`;
+  if(!cands.length) h+=`<div class="empty">같은 브랜드의 무역 건을 찾지 못했어요. (무역팀 시트에 아직 없을 수 있어요)</div>`;
+  else{
+    h+=`<table class="trade-tbl"><thead><tr><th></th><th>무역번호</th><th>브랜드</th><th>MD</th><th>픽업</th><th>선적</th><th>입항</th><th>면허</th></tr></thead><tbody>`;
+    cands.forEach(t=>{
+      const on=linked.includes(t.tn);
+      h+=`<tr class="${on?'lk':''}"><td><button class="miniY adm" onclick="toggleTrade('${t.tn}')">${on?'✓ 해제':'연결'}</button>${on?'<span style="color:var(--green);font-size:10px">✓</span>':''}</td><td>${t.tn}</td><td class="l">${t.brand}</td><td>${t.md||'-'}</td><td>${t.pickup||'-'}</td><td>${t.ship||'-'}</td><td>${t.arrive||'-'}</td><td>${t.customs||'-'}</td></tr>`;
+    });
+    h+=`</tbody></table>`;
+  }
+  const td=tradeDates(o);
+  if(td && Object.keys(td).length){
+    const names={pickup:'픽업',ship:'선적',arrive:'입항',customs:'면허(통관)'};
+    let fills=0;
+    h+=`<table class="trade-tbl"><thead><tr><th>단계</th><th>무역팀 날짜</th><th>내 기록</th><th>판정</th><th></th></tr></thead><tbody>`;
+    for(const k in names){
+      const tv=td[k]; if(!tv) continue;
+      const mv=o.actuals[k]||'';
+      let verdict, act='';
+      if(!mv){ verdict='<span style="color:var(--amber);font-weight:bold">미입력</span>'; act=`<button class="miniY adm" onclick="applyTrade('${k}','${tv}')">채우기</button>`; fills++; }
+      else if(mv===tv){ verdict='<span style="color:var(--green);font-weight:bold">✓ 일치</span>'; }
+      else{ verdict='<span style="color:var(--red);font-weight:bold">⚠ 불일치</span>'; act=`<button class="miniY adm" onclick="applyTrade('${k}','${tv}')">무역팀 값으로</button>`; }
+      h+=`<tr><td><b>${names[k]}</b></td><td>${tv}</td><td>${mv||'-'}</td><td>${verdict}</td><td>${act}</td></tr>`;
+    }
+    h+=`</tbody></table>`;
+    if(fills>0) h+=`<div class="adm" style="text-align:right"><button class="btn btn-y" onclick="applyTradeAll()">📥 비어있는 단계 모두 채우기</button></div>`;
+  }
+  h+=`</div>`;
+  return h;
+}
+function toggleTrade(tn){
+  const o=ORDERS.find(x=>x.id===curId); if(!o) return;
+  o.tradeNos=o.tradeNos||[];
+  const i=o.tradeNos.indexOf(tn);
+  if(i>=0) o.tradeNos.splice(i,1); else o.tradeNos.push(tn);
+  saveOrders(); cloudSaveOrder(o); openModal(curId);
+}
+function applyTrade(k,v){
+  const o=ORDERS.find(x=>x.id===curId); if(!o) return;
+  o.actuals[k]=v; saveOrders(); cloudSaveOrder(o); openModal(curId); renderRadar(); renderList();
+}
+function applyTradeAll(){
+  const o=ORDERS.find(x=>x.id===curId); if(!o) return;
+  const td=tradeDates(o); if(!td) return;
+  let n=0; for(const k in td){ if(!o.actuals[k]){ o.actuals[k]=td[k]; n++; } }
+  saveOrders(); cloudSaveOrder(o); openModal(curId); renderRadar(); renderList();
+}
+
+/* ── 오더 ↔ 물류 칸반 매칭 (해외 + 국내일반. 직납은 물류센터 안 거침) ── */
+function vendorHit(a,b){ a=bNorm(a); b=bNorm(b); if(!a||!b||a.length<3||b.length<3) return false; return a===b||a.includes(b)||b.includes(a); }
+let _logisCands=[];
+function logisCandidates(o){
+  if(getOrderType(o)==='국내직납' || !LOGIS.rows.length) return [];
+  const linked=o.logisKeys||[];
+  let cands=LOGIS.rows.filter(t=> brandHit(o.brand,t.brand) || vendorHit(o.vendor,t.vendor));
+  const a=analyze(o);
+  const ref = parse(o.actuals.inFirst) || ((a.steps.find(s=>s.key==='inFirst')||{}).planned);  // 입고 시점 근접순
+  cands=cands.slice().sort((x,y)=>{
+    const lx=linked.includes(x.key)?0:1, ly=linked.includes(y.key)?0:1; if(lx!==ly) return lx-ly;
+    if(!ref) return 0;
+    const dv=t=>{ const d=t.inFirst||t.planIn; return d?Math.abs(parse(d)-ref):9e15; };
+    return dv(x)-dv(y);
+  });
+  return cands.slice(0,8);
+}
+/* 통합규칙: 최초입고·최초출고=가장 이른 / 검수·입고등록·상품화 완료=가장 늦은 */
+const LOGIS_RULE=[['inFirst','min'],['inspect','max'],['inReg','max'],['product','max'],['out','min']];
+function logisDates(o){
+  const rows=LOGIS.rows.filter(t=>(o.logisKeys||[]).includes(t.key));
+  if(!rows.length) return null;
+  const out={};
+  LOGIS_RULE.forEach(([k,rule])=>{
+    const ds=rows.map(r=>r[k]).filter(Boolean).sort();
+    if(ds.length) out[k]= rule==='min'?ds[0]:ds[ds.length-1];
+  });
+  return out;
+}
+function logisSectionHtml(o){
+  if(getOrderType(o)==='국내직납') return '';
+  if(!LOGIS.rows.length) return `<div class="trade-sec"><h3>🚚 물류 칸반</h3><div class="empty">아직 물류 데이터가 없어요. 사이드바 "🔄 무역·물류 새로고침"을 눌러주세요.</div></div>`;
+  const linked=o.logisKeys||[];
+  const cands=logisCandidates(o); _logisCands=cands;
+  let h=`<div class="trade-sec"><h3>🚚 물류 칸반 연결 <small>(${LOGIS.fetched} 읽음 · 이 오더의 입고 건을 골라 연결하세요)</small></h3>`;
+  if(!cands.length) h+=`<div class="empty">같은 브랜드·업체의 입고 건을 찾지 못했어요. (칸반에 아직 없을 수 있어요)</div>`;
+  else{
+    h+=`<table class="trade-tbl"><thead><tr><th></th><th>업체</th><th>브랜드</th><th>예정입고</th><th>실입고</th><th>검수</th><th>입고등록</th><th>상품화</th><th>출고</th><th>PCS</th></tr></thead><tbody>`;
+    cands.forEach((t,i)=>{
+      const on=linked.includes(t.key);
+      h+=`<tr class="${on?'lk':''}"><td><button class="miniY adm" onclick="toggleLogis(${i})">${on?'✓ 해제':'연결'}</button>${on?'<span style="color:var(--green);font-size:10px">✓</span>':''}</td><td class="l">${t.vendor||'-'}</td><td class="l">${t.brand||'-'}</td><td>${t.planIn||'-'}</td><td>${t.inFirst||'-'}</td><td>${t.inspect||'-'}</td><td>${t.inReg||'-'}</td><td>${t.product||'-'}</td><td>${t.out||'-'}</td><td>${t.qty?t.qty.toLocaleString():'-'}</td></tr>`;
+    });
+    h+=`</tbody></table>`;
+  }
+  const td=logisDates(o);
+  if(td && Object.keys(td).length){
+    const names={inFirst:'최초 입고',inspect:'검수 완료',inReg:'입고 등록',product:'상품화 완료',out:'최초 출고'};
+    let fills=0;
+    h+=`<table class="trade-tbl"><thead><tr><th>단계</th><th>물류 날짜</th><th>내 기록</th><th>판정</th><th></th></tr></thead><tbody>`;
+    for(const k in names){
+      const tv=td[k]; if(!tv) continue;
+      const mv=o.actuals[k]||'';
+      let verdict, act='';
+      if(!mv){ verdict='<span style="color:var(--amber);font-weight:bold">미입력</span>'; act=`<button class="miniY adm" onclick="applyTrade('${k}','${tv}')">채우기</button>`; fills++; }
+      else if(mv===tv){ verdict='<span style="color:var(--green);font-weight:bold">✓ 일치</span>'; }
+      else{ verdict='<span style="color:var(--red);font-weight:bold">⚠ 불일치</span>'; act=`<button class="miniY adm" onclick="applyTrade('${k}','${tv}')">물류 값으로</button>`; }
+      h+=`<tr><td><b>${names[k]}</b></td><td>${tv}</td><td>${mv||'-'}</td><td>${verdict}</td><td>${act}</td></tr>`;
+    }
+    h+=`</tbody></table>`;
+    if(fills>0) h+=`<div class="adm" style="text-align:right"><button class="btn btn-y" onclick="applyLogisAll()">📥 비어있는 단계 모두 채우기</button></div>`;
+  }
+  h+=`</div>`;
+  return h;
+}
+function toggleLogis(i){
+  const o=ORDERS.find(x=>x.id===curId); if(!o||!_logisCands[i]) return;
+  const key=_logisCands[i].key;
+  o.logisKeys=o.logisKeys||[];
+  const j=o.logisKeys.indexOf(key);
+  if(j>=0) o.logisKeys.splice(j,1); else o.logisKeys.push(key);
+  saveOrders(); cloudSaveOrder(o); openModal(curId);
+}
+function applyLogisAll(){
+  const o=ORDERS.find(x=>x.id===curId); if(!o) return;
+  const td=logisDates(o); if(!td) return;
+  let n=0; for(const k in td){ if(!o.actuals[k]){ o.actuals[k]=td[k]; n++; } }
+  saveOrders(); cloudSaveOrder(o); openModal(curId); renderRadar(); renderList();
+}
+
+/* ================= 클라우드(Supabase) — NC PICKS와 동일 구조 ================= */
+/* 데이터=클라우드 DB(모두 같은 데이터 봄), 읽기=누구나, 쓰기=관리자 로그인 필요 */
+const SUPABASE_URL='https://tdbdxprjkwvlscsdstcg.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkYmR4cHJqa3d2bHNjc2RzdGNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMDc1MzMsImV4cCI6MjA5Mjg4MzUzM30.O4y2kBIimY1b1SqCo_kSQJzOzN3LwJKBFqJLikRuGT4';
+let SB=null, IS_ADMIN=false;
+function setAdmin(on){
+  IS_ADMIN=on;
+  document.body.classList.toggle('is-admin', on);
+  document.getElementById('navAdmin').style.display = on?'':'none';
+  document.getElementById('btnLogin').style.display = on?'none':'';
+  document.getElementById('btnLogout').style.display = on?'':'none';
+  // 로그아웃 상태에서 관리자판 보고 있었으면 대시보드로
+  if(!on && document.getElementById('pg-admin').classList.contains('on')) document.querySelector('.nav a[data-pg="radar"]').click();
+}
+function stripCache(o){ const c={...o}; delete c._a; return c; }
+async function cloudBoot(){
+  const info=document.getElementById('cloudInfo');
+  try{
+    const {data,error}=await SB.from('mdp_orders').select('id,payload').order('id');
+    if(error) throw error;
+    if(data && data.length){
+      ORDERS=data.map(r=>r.payload);
+      saveOrders(); rebuildFilters(); renderRadar(); renderList(); renderAgg();
+    }
+    const {data:st}=await SB.from('mdp_settings').select('key,value');
+    (st||[]).forEach(r=>{ if(r.key==='owner_names' && r.value) OWNER_NAMES=r.value; });
+    renderRadar();
+    info.textContent='☁ 클라우드 연결됨 · 오더 '+(data?data.length:0)+'건';
+  }catch(e){ info.textContent='☁ 오프라인 — 내 PC 데이터로 표시 중'; }
+}
+async function cloudSaveOrder(o){
+  if(!SB||!IS_ADMIN||!o) return;
+  try{ const {error}=await SB.from('mdp_orders').upsert({id:o.id, payload:stripCache(o), updated_at:new Date().toISOString()}); if(error) throw error; }
+  catch(e){ document.getElementById('cloudInfo').textContent='☁ 저장 실패: '+e.message; }
+}
+async function cloudDeleteOrder(id){
+  if(!SB||!IS_ADMIN) return;
+  try{ await SB.from('mdp_orders').delete().eq('id',id); }catch(e){}
+}
+async function cloudSaveAll(){
+  if(!SB){ alert('클라우드에 연결돼 있지 않아요.'); return; }
+  if(!IS_ADMIN){ alert('관리자 로그인이 필요해요.'); return; }
+  try{
+    const rows=ORDERS.map(o=>({id:o.id, payload:stripCache(o), updated_at:new Date().toISOString()}));
+    const {error}=await SB.from('mdp_orders').upsert(rows); if(error) throw error;
+    const ids=ORDERS.map(o=>o.id);
+    const {data:cl}=await SB.from('mdp_orders').select('id');
+    const del=(cl||[]).map(r=>r.id).filter(id=>!ids.includes(id));
+    if(del.length) await SB.from('mdp_orders').delete().in('id',del);
+    document.getElementById('cloudInfo').textContent='☁ 클라우드 연결됨 · 오더 '+rows.length+'건';
+    alert('클라우드에 '+rows.length+'건을 올렸어요! ☁\n이제 링크로 여는 모든 사람에게 이 데이터가 보여요.');
+  }catch(e){ alert('클라우드 저장 실패: '+e.message); }
+}
+async function cloudSaveSettings(){
+  if(!SB||!IS_ADMIN) return;
+  try{ await SB.from('mdp_settings').upsert({key:'owner_names', value:OWNER_NAMES, updated_at:new Date().toISOString()}); }catch(e){}
+}
+/* 로그인 */
+function openLogin(){ document.getElementById('login-err').textContent=''; document.getElementById('loginModal').classList.add('on'); document.getElementById('login-email').focus(); }
+function closeLogin(){ document.getElementById('loginModal').classList.remove('on'); }
+async function doLogin(){
+  if(!SB){ document.getElementById('login-err').textContent='클라우드에 연결돼 있지 않아요. 인터넷을 확인하세요.'; return; }
+  const email=document.getElementById('login-email').value.trim(), pw=document.getElementById('login-pw').value;
+  if(!email||!pw){ document.getElementById('login-err').textContent='이메일과 비밀번호를 입력하세요.'; return; }
+  const {error}=await SB.auth.signInWithPassword({email, password:pw});
+  if(error){ document.getElementById('login-err').textContent='로그인 실패: '+error.message; return; }
+  closeLogin();
+}
+async function doLogout(){ if(SB) await SB.auth.signOut(); }
+function initCloud(){
+  try{
+    if(!window.supabase){ document.getElementById('cloudInfo').textContent='☁ 오프라인 — 내 PC 데이터로 표시 중'; return; }
+    SB=window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    SB.auth.onAuthStateChange((_e,session)=>setAdmin(!!session));
+    SB.auth.getSession().then(({data:{session}})=>{ setAdmin(!!session); cloudBoot(); });
+  }catch(e){ document.getElementById('cloudInfo').textContent='☁ 오프라인 — 내 PC 데이터로 표시 중'; }
+}
+
+/* ================= 초기화 ================= */
+function initFilters(){
+  const mds=[...new Set(ORDERS.map(o=>o.md))], cats=[...new Set(ORDERS.map(o=>o.cat))];
+  mds.forEach(m=>document.getElementById('f-md').insertAdjacentHTML('beforeend',`<option>${m}</option>`));
+  cats.forEach(c=>document.getElementById('f-cat').insertAdjacentHTML('beforeend',`<option>${c}</option>`));
+  STAGES.forEach(s=>document.getElementById('f-stage').insertAdjacentHTML('beforeend',`<option value="${s.key}">${s.name} 대기</option>`));
+  document.getElementById('f-stage').insertAdjacentHTML('beforeend','<option value="done">✓ 출고완료</option>');
+  ['f-md','f-cat','f-status','f-stage','f-sort'].forEach(id=>document.getElementById(id).onchange=renderList);
+  document.getElementById('f-search').oninput=renderList;
+}
+document.getElementById('btnNew').onclick=()=>{editId=null;openNew();};
+document.getElementById('btnUpload').onclick=()=>document.getElementById('fileUp').click();
+document.getElementById('fileUp').onchange=handleUpload;
+document.querySelectorAll('.nav a[data-pg]').forEach(a=>a.onclick=()=>{
+  document.querySelectorAll('.nav a').forEach(x=>x.classList.remove('on'));
+  a.classList.add('on');
+  const pg=a.dataset.pg;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pg-'+pg).classList.add('on');
+  document.getElementById('pgTitle').textContent=a.textContent.trim().replace(/^[^\s]+\s/,'');
+  if(pg==='list') renderList();
+  if(pg==='agg') renderAgg();
+  if(pg==='admin') renderAdmin();
+});
+// 대시보드 담당자 필터 + 내 이름 저장
+(function(){
+  const rmdSel=document.getElementById('r-md');
+  [...new Set(ORDERS.map(o=>o.md).filter(Boolean))].sort().forEach(m=>rmdSel.insertAdjacentHTML('beforeend',`<option>${m}</option>`));
+  const myname=localStorage.getItem('mdp_myname')||'';
+  if(myname){ rmdSel.value=myname; document.getElementById('r-myname').textContent='⭐ '+myname; }
+  rmdSel.onchange=renderRadar;
+  document.getElementById('r-kakao').onclick=copyKakao;
+  document.getElementById('r-export').onclick=exportAlarm;
+  document.getElementById('r-owners').onclick=openOwners;
+  document.getElementById('r-saveme').onclick=()=>{ const v=rmdSel.value; if(!v){alert('담당자를 먼저 선택하세요.');return;} localStorage.setItem('mdp_myname',v); document.getElementById('r-myname').textContent='⭐ '+v+' 저장됨'; alert('"'+v+'"님으로 저장했어요. 다음부터 열면 자동으로 내 오더만 보여요.'); };
+})();
+document.getElementById('today').textContent=fmtY(TODAY);
+document.getElementById('btnTrade').onclick=()=>refreshSheets(false);
+document.getElementById('btnLogin').onclick=openLogin;
+document.getElementById('btnLogout').onclick=doLogout;
+document.getElementById('login-pw').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+updateTradeInfo();
+initFilters(); renderRadar(); renderList();
+initCloud();          // 클라우드 연결 + 로그인 상태 복원 + 오더 불러오기
+refreshSheets(true);  // 열 때마다 무역팀+물류 시트 자동 새로고침 (실패해도 조용히 넘어감)
+</script>
+</body>
+</html>
