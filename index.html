@@ -382,10 +382,14 @@ function switchView(v){CURV=v;["dash","orders","pipe","agg","pending","recon","d
 var RAWISO={};            // 행번호 → 원본(import) actiso  (재import시 이거로 갱신)
 function ovGet(){try{return JSON.parse(localStorage.getItem("mdp_db_ov")||"{}");}catch(e){return{};}}
 function ovSet(o){localStorage.setItem("mdp_db_ov",JSON.stringify(o));}
-function recompLT(o){   // actiso(전체날짜)로 구간·총 리드타임 재계산
+function recompLT(o){   // actiso(전체날짜)로 구간·총 리드타임 재계산 (mdp_dashboard_data.py와 동일 규칙)
   var D=o.actiso.map(function(s){return s?new Date(s+"T00:00:00"):null;});
   function df(a,b){return (a&&b)?Math.round((a-b)/86400000):null;}
   o.lt=[null];for(var i=1;i<18;i++)o.lt.push(df(D[i],D[i-1]));
+  // ★결제(8) 모니터링 제외, 픽업(9)=PO생성→픽업 브리지
+  o.lt[8]=null; o.lt[9]=df(D[9],D[7]);
+  // 국내(IN-LAND): 픽업~면허(9~12) 없음 / 물류입고(13)=품의완료→입고
+  if(o.ship==="IN-LAND"){ o.lt[9]=null;o.lt[10]=null;o.lt[11]=null;o.lt[12]=null; o.lt[13]=df(D[13],D[5]); }
   o.ltin=df(D[13],D[0]); o.ltmid=df(D[16],D[13]); o.ltout=df(D[17],D[0]);
   o.act=o.actiso.map(function(s){return s?s.slice(5):"";});
 }
