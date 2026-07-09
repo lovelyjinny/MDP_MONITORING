@@ -322,11 +322,12 @@ function renderTimeline(f){
   else if(sort==="name")list.sort(function(a,b){return (a.md||"힣").localeCompare(b.md||"힣","ko")||(a.br||"").localeCompare(b.br||"","ko")||(a.sea||"").localeCompare(b.sea||"","ko")||(monK(a.month)-monK(b.month));});
   else list.sort(function(a,b){return (monK(a.month)-monK(b.month))||((a.actiso[2]||"9999").localeCompare(b.actiso[2]||"9999"))||(a.br||"").localeCompare(b.br||"","ko");});   // 계절월순(기본): 같으면 매입보고 빠른 순
   document.getElementById("cnt").textContent=list.length+"건"+(list.length>150?" (상위 150)":"");
-  document.getElementById("thead").innerHTML="<th class='c1' style='text-align:left;padding-left:8px;'>담당자</th><th class='c2' style='text-align:left;'>브랜드</th><th style='text-align:left;'>시즌</th><th>계절월</th>"+STAGES.map(function(s){return "<th>"+s+"</th>";}).join("");
+  document.getElementById("thead").innerHTML="<th class='c1' style='text-align:left;padding-left:8px;'>담당자</th><th class='c2' style='text-align:left;'>브랜드</th><th style='text-align:left;'>시즌</th><th>계절월</th>"+STAGES.map(function(s,si){return si===8?"":"<th>"+s+"</th>";}).join("");
   var body=list.slice(0,150).map(function(o,i){
     var ci=catInfo(o);
     var cells=o.st.map(function(s,j){
-      if(s==="skip")return (j>=8&&j<=12&&o.ship==="IN-LAND")?"<td><div class='cell' title='"+STAGES[j]+" · 해당없음(국내=무역 구간 없음)' style='background:#2a2620'></div></td>":"<td style='text-align:center;color:#d2cabb;'>·</td>";
+      if(j===8)return "";   // 결제: 모니터링 제외 (컬럼 없음)
+      if(s==="skip")return (j>=9&&j<=12&&o.ship==="IN-LAND")?"<td><div class='cell' title='"+STAGES[j]+" · 해당없음(국내=무역 구간 없음)' style='background:#2a2620'></div></td>":"<td style='text-align:center;color:#d2cabb;'>·</td>";
       return "<td><div class='cell' title='"+STAGES[j]+" · "+LBL[s]+"' style='background:"+COL[s]+"'></div></td>";}).join("");
     return "<tr data-i='"+i+"'>"+
       "<td class='c1' style='padding-left:8px;white-space:nowrap;'>"+o.md+"</td>"+
@@ -342,6 +343,7 @@ function renderTimeline(f){
 function openDetail(o){
   var rows="";
   for(var i=0;i<STAGES.length;i++){var s=o.st[i];
+    if(i===8){var pd=o.actiso[8]?o.actiso[8].slice(5):"";rows+="<div class='stg'><span class='dot' style='background:#e7e9ef;'></span><span style='color:var(--tx3);'>"+STAGES[i]+"</span><span class='tg num'>"+(pd||"—")+"</span><span class='bdg' style='background:var(--slatebg);color:var(--slate);'>모니터링 제외</span></div>";continue;}
     if(s==="skip"){rows+="<div class='stg'><span class='dot' style='background:#e7e9ef;'></span><span style='color:var(--tx3);'>"+STAGES[i]+"</span><span class='tg'>—</span><span class='bdg' style='background:var(--slatebg);color:var(--slate);'>건너뜀</span></div>";continue;}
     var t=TINT[s]||TINT.plan, tg=(o.tg&&o.tg[i])?("목표 "+o.tg[i]):"";
     rows+="<div class='stg'><span class='dot' style='background:"+COL[s]+";'></span><span>"+STAGES[i]+"</span><span class='tg num'>"+tg+"</span><span class='bdg' style='background:"+t[1]+";color:"+t[0]+";'>"+LBL[s]+"</span></div>";
@@ -532,7 +534,7 @@ function renderSettings(){
 }
 var OFILT={stage:"all",q:""}, PFILT={stage:"all",q:""};
 function stageOf(o){return o.lv==="done"?"출고완료":o.step;}
-function stageOpts(){return "<option value='all'>진행단계 전체</option>"+STAGES.map(function(s){return "<option value='"+s+"'>"+s+"</option>";}).join("")+"<option value='출고완료'>출고완료</option>";}
+function stageOpts(){return "<option value='all'>진행단계 전체</option>"+STAGES.map(function(s,si){return si===8?"":"<option value='"+s+"'>"+s+"</option>";}).join("")+"<option value='출고완료'>출고완료</option>";}
 function ordSort(a,b){return (a.md||"힣").localeCompare(b.md||"힣","ko")||(a.br||"").localeCompare(b.br||"","ko")||(a.sea||"").localeCompare(b.sea||"","ko")||(monK(a.month)-monK(b.month));}
 function renderOrders(f){
   document.getElementById("view-orders").innerHTML=
@@ -591,10 +593,11 @@ function fillPipe(){
     if(PFILT.stage!=="all"&&stageOf(o)!==PFILT.stage)return false;
     if(PFILT.q&&o.br.indexOf(PFILT.q)<0)return false; return true;
   }).sort(ordSort);
-  var head="<th class='c1' style='text-align:left;padding-left:8px;'>담당자</th><th class='c2' style='text-align:left;'>브랜드</th><th style='text-align:left;'>시즌</th><th>계절월</th>"+STAGES.map(function(s){return "<th>"+s+"</th>";}).join("");
+  var head="<th class='c1' style='text-align:left;padding-left:8px;'>담당자</th><th class='c2' style='text-align:left;'>브랜드</th><th style='text-align:left;'>시즌</th><th>계절월</th>"+STAGES.map(function(s,si){return si===8?"":"<th>"+s+"</th>";}).join("");
   var rows=list.map(function(o,i){var ci=catInfo(o);
     var cells=o.st.map(function(s,j){
-      if(s==="skip")return (j>=8&&j<=12&&o.ship==="IN-LAND")?"<td><div class='cell' title='"+STAGES[j]+" · 해당없음(국내=무역 구간 없음)' style='background:#2a2620'></div></td>":"<td style='text-align:center;color:#d2cabb;'>·</td>";
+      if(j===8)return "";   // 결제: 모니터링 제외 (컬럼 없음)
+      if(s==="skip")return (j>=9&&j<=12&&o.ship==="IN-LAND")?"<td><div class='cell' title='"+STAGES[j]+" · 해당없음(국내=무역 구간 없음)' style='background:#2a2620'></div></td>":"<td style='text-align:center;color:#d2cabb;'>·</td>";
       return "<td><div class='cell' title='"+STAGES[j]+" · "+LBL[s]+"' style='background:"+COL[s]+"'></div></td>";}).join("");
     return "<tr data-i='"+i+"'>"+
       "<td class='c1' style='padding-left:8px;white-space:nowrap;'>"+o.md+"</td>"+
