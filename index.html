@@ -701,7 +701,9 @@ function renderAggView(f){
     var body=tgtRow+totRow+vals.map(function(v){return grpRow(v,f.filter(function(o){return o[key]===v;}));}).join("");
     return "<div class='card' style='margin-bottom:12px;'><div class='ch'><h2>"+title+"</h2></div>"+
       "<div style='overflow:auto;'><table class='mtx'><thead><tr>"+mtxHead+"</tr></thead><tbody>"+body+"</tbody></table></div></div>";}
-  var shipMtx=ltMatrix("운송수단 × 구간 리드타임","ship",["OCEAN","AIR","IN-LAND"])
+  f.forEach(function(o){o.dom=(o.region==="국내"?"국내":"해외");});
+  var shipMtx=ltMatrix("국내/해외 × 구간 리드타임","dom",["국내","해외"])
+    +ltMatrix("운송수단 × 구간 리드타임","ship",["OCEAN","AIR","IN-LAND"])
     +ltMatrix("카테고리 × 구간 리드타임","cat",grpVals("cat",["남성","여성","아동","잡화"]))
     +ltMatrix("시즌 × 구간 리드타임","sea",grpVals("sea",null));
   var chips=[
