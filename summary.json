@@ -1,0 +1,67 @@
+{
+ "board": "mdp",
+ "stage": 2,
+ "unit": "건",
+ "asof": "2026-11-06",
+ "generated": "2026-11-13 23:15:36",
+ "source": "글로벌 MDP 관리 판 · SAP 발주관리 실적 최종일 기준 · 웹 게시본",
+ "key": [
+  {
+   "name": "지연 오더",
+   "value": 42,
+   "unit": "건",
+   "text": "42건",
+   "better": "down"
+  },
+  {
+   "name": "임박 오더",
+   "value": 1,
+   "unit": "건",
+   "text": "1건",
+   "better": "down"
+  },
+  {
+   "name": "진행 중 오더",
+   "value": 96,
+   "unit": "건",
+   "text": "96건"
+  }
+ ],
+ "blocked": [
+  {
+   "what": "메종키츠네(MAISONKITSUNE) — 출고 단계 +220일 지연 · 구간 담당 물류팀",
+   "size": 253,
+   "unit": "백만",
+   "size_text": "253백만",
+   "deadline": "2026-03-31"
+  },
+  {
+   "what": "키플링(KIPLING) — 출고 단계 +190일 지연 · 구간 담당 물류팀",
+   "size": 189,
+   "unit": "백만",
+   "size_text": "189백만",
+   "deadline": "2026-04-30"
+  },
+  {
+   "what": "아르켓(ARKET) — 출고 단계 +159일 지연 · 구간 담당 물류팀",
+   "size": 190,
+   "unit": "백만",
+   "size_text": "190백만",
+   "deadline": "2026-05-31"
+  },
+  {
+   "what": "아르켓 홈(ARKET HOME) — 출고 단계 +159일 지연 · 구간 담당 물류팀",
+   "size": 8,
+   "unit": "백만",
+   "size_text": "8백만",
+   "deadline": "2026-05-31"
+  },
+  {
+   "what": "띠어리(THEORY) — 출고 단계 +159일 지연 · 구간 담당 물류팀",
+   "size": 1,
+   "unit": "백만",
+   "size_text": "1백만",
+   "deadline": "2026-05-31"
+  }
+ ]
+}
